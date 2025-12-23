@@ -19,6 +19,10 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Debug variables
+        run: |
+          echo "AWS_REGION='${{ vars.AWS_REGION }}'"
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -38,4 +42,4 @@ jobs:
 
       - name: CDK deploy
         working-directory: infrastructure
-        run: npx cdk deploy --all --require-approval never
+        run: npx cdk deploy SufAlertsStack --require-approval never
