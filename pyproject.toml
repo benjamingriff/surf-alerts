@@ -5,3 +5,29 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+
+[tool.uv.workspace]
+members = [
+    "packages/jobs/dispatcher",
+    "packages/migrations/archive_legacy_data",
+    "packages/scrapers/spot_scraper",
+]
+
+[tool.uv.sources]
+spot-scraper = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "rich>=14.2.0",
+    "spot-scraper",
+]
+
+[tool.ruff]
+line-length = 100 
+
+[tool.pytest.ini_options]
+env = [
+  "POWERTOOLS_LOG_LEVEL=INFO",
+]
+python_files = "test_*.py"

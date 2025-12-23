@@ -1,0 +1,15 @@
+[project]
+name = "spot-scraper"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aws-lambda-powertools>=3.23.0",
+    "boto3>=1.42.15",
+    "curl-cffi>=0.14.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.14,<0.10.0"]
+build-backend = "uv_build"
