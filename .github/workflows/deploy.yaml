@@ -1,0 +1,41 @@
+name: Deploy AWS
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/GitHubActionsCdkDeployRole
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Who am I?
+        run: aws sts get-caller-identity
+
+      - name: Install deps
+        working-directory: infrastructure
+        run: npm ci
+
+      - name: CDK synth
+        working-directory: infrastructure
+        run: npx cdk synth
+
+      - name: CDK deploy
+        working-directory: infrastructure
+        run: npx cdk deploy --all --require-approval never
