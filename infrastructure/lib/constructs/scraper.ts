@@ -60,7 +60,7 @@ export class ScraperWorker extends Construct {
     this.lambdaFunction.addEventSource(
       new lambdaEventSources.SqsEventSource(this.queue, {
         batchSize: 1,
-        maxConcurrency: props.maxConcurrency ?? 1,
+        maxConcurrency: props.maxConcurrency ?? 2,
         enabled: true,
         reportBatchItemFailures: true,
       }),

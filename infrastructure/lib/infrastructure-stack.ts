@@ -14,6 +14,7 @@ export class InfrastructureStack extends cdk.Stack {
       scraperName: "spot-scraper",
       codePath: path.join(
         codebuildSrcDir,
+        "..",
         "packages",
         "scrapers",
         "spot_scraper",
