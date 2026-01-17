@@ -8,19 +8,24 @@ dependencies = []
 
 [tool.uv.workspace]
 members = [
+    "packages/cli",
     "packages/jobs/dispatcher",
     "packages/migrations/archive_legacy_data",
-    "packages/scrapers/spot_scraper",
+    "packages/scrapers/forecast_scraper",
 ]
 
 [tool.uv.sources]
+cli = { workspace = true }
 spot-scraper = { workspace = true }
+forecast-scraper = { workspace = true }
 
 [dependency-groups]
 dev = [
+    "cli",
+    "forecast-scraper",
+    "moto>=5.1.19",
     "pytest>=9.0.2",
     "rich>=14.2.0",
-    "spot-scraper",
 ]
 
 [tool.ruff]
