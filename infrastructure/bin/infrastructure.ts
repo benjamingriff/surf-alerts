@@ -10,10 +10,10 @@ const env = {
   region: process.env.CDK_DEFAULT_REGION,
 };
 
-new CiIamStack(app, "CiIamStack", {
-  env,
-  githubOwner: "benjamingriff",
-  githubRepo: "surf-alerts",
-});
+// new CiIamStack(app, "CiIamStack", {
+//   env,
+//   githubOwner: "benjamingriff",
+//   githubRepo: "surf-alerts",
+// });
 
 new InfrastructureStack(app, "SufAlertsStack", { env });
