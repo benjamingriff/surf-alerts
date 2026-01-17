@@ -1,0 +1,20 @@
+[project]
+name = "cli"
+version = "0.1.0"
+description = "CLI tool to run scrapers locally and save sample data"
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=14.0.0",
+    "forecast-scraper",
+]
+
+[project.scripts]
+sample = "cli.main:app"
+
+[tool.uv.sources]
+forecast-scraper = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9.14,<0.10.0"]
+build-backend = "uv_build"
