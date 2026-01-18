@@ -7,7 +7,11 @@
       "Bash(uv run sample --help:*)",
       "Bash(uv run sample forecast --help:*)",
       "Bash(uv run:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(npm run build:*)",
+      "Bash(ruff check:*)",
+      "Bash(python:*)",
+      "Bash(ls:*)"
     ]
   }
 }
