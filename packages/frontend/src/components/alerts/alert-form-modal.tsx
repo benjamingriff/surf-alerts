@@ -20,6 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
+const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+type DayOfWeek = (typeof ALL_DAYS)[number];
+
 interface AlertFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,6 +38,46 @@ function getSpotsByRegion(): Map<string, Spot[]> {
     grouped.set(spot.region, spots);
   }
   return grouped;
+}
+
+function DaySelector({
+  selectedDays,
+  onChange,
+}: {
+  selectedDays: string[];
+  onChange: (days: string[]) => void;
+}) {
+  const toggleDay = (day: DayOfWeek) => {
+    if (selectedDays.includes(day)) {
+      onChange(selectedDays.filter((d) => d !== day));
+    } else {
+      onChange([...selectedDays, day]);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Select days">
+      {ALL_DAYS.map((day) => {
+        const isSelected = selectedDays.includes(day);
+        return (
+          <button
+            key={day}
+            type="button"
+            role="checkbox"
+            aria-checked={isSelected}
+            onClick={() => toggleDay(day)}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              isSelected
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {day}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function StarRatingSelector({
@@ -95,6 +138,7 @@ export function AlertFormModal({
 }: AlertFormModalProps) {
   const [selectedSpotId, setSelectedSpotId] = useState("");
   const [minRating, setMinRating] = useState(0);
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
 
   const spotsByRegion = getSpotsByRegion();
   const selectedSpot = surfSpots.find((s) => s.id === selectedSpotId);
@@ -105,9 +149,11 @@ export function AlertFormModal({
       if (editingAlert) {
         setSelectedSpotId(editingAlert.spotId);
         setMinRating(editingAlert.minRating);
+        setSelectedDays(editingAlert.days);
       } else {
         setSelectedSpotId("");
         setMinRating(0);
+        setSelectedDays([]);
       }
     }
   }, [open, editingAlert]);
@@ -163,6 +209,20 @@ export function AlertFormModal({
             {minRating > 0 && (
               <p className="text-xs text-muted-foreground">
                 Alert when conditions are {minRating}+ stars
+              </p>
+            )}
+          </div>
+
+          {/* Day Selection */}
+          <div className="space-y-2">
+            <Label>Alert Days</Label>
+            <DaySelector
+              selectedDays={selectedDays}
+              onChange={setSelectedDays}
+            />
+            {selectedDays.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Select at least one day to receive alerts
               </p>
             )}
           </div>
