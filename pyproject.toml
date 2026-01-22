@@ -10,19 +10,27 @@ dependencies = []
 members = [
     "packages/cli",
     "packages/jobs/dispatcher",
+    "packages/jobs/spot_reconciler",
     "packages/migrations/archive_legacy_data",
     "packages/scrapers/forecast_scraper",
+    "packages/scrapers/sitemap_scraper",
+    "packages/scrapers/taxonomy_scraper",
 ]
 
 [tool.uv.sources]
 cli = { workspace = true }
-spot-scraper = { workspace = true }
 forecast-scraper = { workspace = true }
+sitemap-scraper = { workspace = true }
+taxonomy-scraper = { workspace = true }
+spot-reconciler = { workspace = true }
 
 [dependency-groups]
 dev = [
     "cli",
     "forecast-scraper",
+    "sitemap-scraper",
+    "taxonomy-scraper",
+    "spot-reconciler",
     "moto>=5.1.19",
     "pytest>=9.0.2",
     "rich>=14.2.0",
