@@ -1,0 +1,14 @@
+[project]
+name = "spot-reconciler"
+version = "0.1.0"
+description = "Merges sitemap and taxonomy data, detects spot changes"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aws-lambda-powertools>=3.23.0",
+    "boto3>=1.42.15",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.14,<0.10.0"]
+build-backend = "uv_build"
