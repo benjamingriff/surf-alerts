@@ -226,6 +226,24 @@ export function AlertFormModal({
               </p>
             )}
           </div>
+
+          {/* Text Message Preview */}
+          {selectedSpot && minRating > 0 && (
+            <div className="space-y-2">
+              <Label>Message Preview</Label>
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm">
+                  <p>
+                    🏄 Surf Alert: {selectedSpot.name} is {minRating}+ stars
+                    today!
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This is how your alert will look when conditions are met
+              </p>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
