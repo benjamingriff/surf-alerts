@@ -1,0 +1,224 @@
+# Ralph Progress Log
+Started: Thu 22 Jan 2026 11:09:11 GMT
+---
+
+## Codebase Patterns
+- Frontend uses Next.js 14+ with App Router in packages/frontend
+- shadcn/ui components with new-york style and slate base color
+- Ocean-inspired color palette (blues/teals) in globals.css using OKLCH colors
+- Inter font as default sans-serif via next/font/google
+- Run `npm run dev` from packages/frontend to start dev server
+- Run `npx tsc --noEmit` for typecheck
+- Alerts context lives in `src/lib/alerts-context.tsx` and is provided via `src/components/providers.tsx`
+- Alerts context uses lazy state initialization to seed localStorage data without useEffect setState
+- Signup form validation uses field-level error state with aria-invalid and text-destructive styles
+
+
+
+## 2026-01-22 11:47 - US-011
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented
+  - Added dashboard home page with welcome message, alert stats, quick actions, and active alerts preview
+  - Uses auth context for user greeting and mock alerts for summary counts
+- Files changed
+  - packages/frontend/src/app/dashboard/page.tsx
+- **Learnings for future iterations:**
+  - Dashboard home page uses mockAlerts for summary stats until alerts context is added
+  - Use shadcn/ui Card for dashboard summary tiles and action panels
+---
+
+## 2026-01-22 - US-001
+- What was implemented:
+  - Created packages/frontend directory with Next.js 16.1.4 App Router
+  - Configured TypeScript 5 and Tailwind CSS 4
+  - Initialized shadcn/ui with new-york style and slate base color
+  - Set up ocean-inspired color palette (blues/teals) in globals.css
+  - Configured Inter font as default sans-serif
+  - Verified dev server runs and typecheck passes
+- Files changed:
+  - packages/frontend/* (19 new files)
+  - Key files: layout.tsx, globals.css, components.json, package.json, tsconfig.json
+- **Learnings for future iterations:**
+  - Next.js 16 uses Tailwind CSS v4 which uses @theme inline for CSS variables instead of tailwind.config.ts
+  - shadcn/ui v3.7+ works with Tailwind v4 and uses OKLCH color format
+  - Color palette is defined in globals.css :root and .dark selectors, not in tailwind.config
+---
+
+## 2026-01-22 - US-002
+- What was implemented:
+  - Created src/lib/mock-data.ts with TypeScript types for Spot, User, Alert
+  - Added 17 real California surf spots with id, name, and region
+  - Spots cover Northern California, Santa Cruz, Santa Barbara, Los Angeles, Orange County, and San Diego
+  - Created mockUser object with name, email, phone fields
+  - Created mockAlerts array with 3 sample alerts showing different configurations
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/lib/mock-data.ts (new file)
+- **Learnings for future iterations:**
+  - Alert type includes spotId, spotName (denormalized for display), minRating (1-5), days array, and isActive boolean
+  - Days are stored as abbreviated strings: 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+  - Spot IDs use kebab-case (e.g., 'lower-trestles')
+---
+
+## 2026-01-22 12:45 - US-004
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented
+  - Updated src/app/page.tsx with hero section
+  - Clear headline "Never Miss the Perfect Wave" with primary color accent
+  - Subheadline explaining surf alerts value prop
+  - Primary CTA button "Get Started" linking to /signup
+  - Secondary "Learn More" button linking to #how-it-works anchor
+  - Ocean-themed background with gradient and blur effects
+  - SVG wave pattern at bottom for visual interest
+  - Fully responsive design (mobile/tablet/desktop breakpoints)
+  - Verified typecheck passes
+- Files changed
+  - packages/frontend/src/app/page.tsx
+- **Learnings for future iterations:**
+  - Use relative + absolute positioning with -z-10 for background elements
+  - blur-3xl creates nice ambient glow effects for ocean theme
+  - SVG wave pattern with preserveAspectRatio="none" scales to fit container width
+  - Button size="lg" with custom py-6 creates larger touch targets for CTAs
+  - Landing page sections use <section> elements within <main>
+---
+
+## 2026-01-22 - US-005
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Added "How it Works" section to landing page below hero
+  - Three-step flow with icons: Pick Your Spots, Set Your Threshold, Get Text Alerts
+  - Each step includes numbered badge, icon, title, and description
+  - Responsive grid layout with consistent spacing
+- Files changed:
+  - packages/frontend/src/app/page.tsx
+- **Learnings for future iterations:**
+  - Inline SVG icons avoid extra dependencies
+  - Numbered badges use rounded-full bg-primary for emphasis
+  - Section id="how-it-works" enables anchor links from hero
+---
+
+## 2026-01-22 - US-006
+- What was implemented:
+  - Added features/benefits section to landing page below "How it Works"
+  - Six feature cards: Multiple Spots, Rating Thresholds, Day Selection, Instant SMS, Real-time Data, Easy Setup
+  - Each card has inline SVG icon (from heroicons), title, and description
+  - Modern minimalist card design with rounded-xl, border, subtle shadow, and hover:shadow-md transition
+  - Responsive grid: 1 col mobile, 2 cols md, 3 cols lg
+  - Section has white background (no bg-muted) to create visual rhythm with alternating sections
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/app/page.tsx (added Features section)
+- **Learnings for future iterations:**
+  - Card design: rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md
+  - Icon containers: h-12 w-12 rounded-lg bg-primary/10 text-primary for feature cards
+  - Alternating section backgrounds (white, muted/30, white) creates visual hierarchy
+---
+
+## 2026-01-22 11:58 - US-003
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented
+  - Created src/components/landing/header.tsx with sticky navigation header
+  - Header displays 'Surf Alerts' brand name on left, Login and Sign Up buttons on right
+  - Buttons link to /login and /signup routes using Next.js Link component
+  - Header uses backdrop-blur for a modern glassmorphism effect
+  - Installed shadcn/ui Button component with @radix-ui/react-slot dependency
+  - Created placeholder /login and /signup pages so routes work
+  - Updated page.tsx to include the Header component
+- Files changed
+  - packages/frontend/src/components/landing/header.tsx (new file)
+  - packages/frontend/src/components/ui/button.tsx (new file from shadcn/ui)
+  - packages/frontend/src/app/page.tsx (updated to include Header)
+  - packages/frontend/src/app/login/page.tsx (new placeholder)
+  - packages/frontend/src/app/signup/page.tsx (new placeholder)
+  - packages/frontend/package.json (added @radix-ui/react-slot dependency)
+- **Learnings for future iterations:**
+  - Use shadcn/ui Button with asChild prop and Link component for navigation buttons
+  - Header uses sticky positioning with z-50 for proper layering
+  - Container uses max-w-7xl and responsive px-4 sm:px-6 lg:px-8 for consistent layout
+---
+
+## 2026-01-22 12:11 - US-008
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented
+  - Verified signup page UI meets acceptance criteria
+  - Confirmed client-side validation for email format, password length, and matching confirmation
+  - Confirmed signup form sets auth state and routes to dashboard
+- Files changed
+  - ralph/prd.json
+- **Learnings for future iterations:**
+  - Signup form uses a shared Card layout with field-level errors and aria-invalid attributes
+---
+
+## 2026-01-22 - US-009
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Created src/lib/auth-context.tsx with React Context for mock authentication
+  - Provides user object (from mockUser) when logged in, null when logged out
+  - isAuthenticated boolean derived from user !== null
+  - login() function sets user to mockUser, logout() sets user to null
+  - Created src/components/providers.tsx as a client component wrapper
+  - Wrapped app in AuthProvider via Providers component in layout.tsx
+  - Updated login and signup pages to call login() on form submission
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/lib/auth-context.tsx (new file)
+  - packages/frontend/src/components/providers.tsx (new file)
+  - packages/frontend/src/app/layout.tsx (added Providers wrapper)
+  - packages/frontend/src/app/login/page.tsx (added useAuth hook, call login())
+  - packages/frontend/src/app/signup/page.tsx (added useAuth hook, call login())
+- **Learnings for future iterations:**
+  - Server Components (layout.tsx) cannot use React Context directly - need a "use client" wrapper component
+  - Create a Providers component to wrap multiple context providers in one place
+  - useAuth hook provides type-safe access to auth context with error if used outside provider
+  - Login/signup pages can call login() before router.push() to set auth state
+---
+
+## 2026-01-22 - US-010
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Created src/app/dashboard/layout.tsx with full dashboard layout
+  - Fixed sidebar on left with navigation: Home, Alerts, Settings
+  - Each nav item has inline SVG icon from heroicons
+  - User section at bottom shows name initials avatar, name, email, and logout button
+  - Responsive: sidebar hidden on mobile, replaced with hamburger menu header
+  - Mobile overlay sidebar slides in from left with close button
+  - Uses useAuth context to display user name and handle logout
+  - Simplified dashboard page.tsx since layout handles outer structure
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/app/dashboard/layout.tsx (new file)
+  - packages/frontend/src/app/dashboard/page.tsx (simplified)
+- **Learnings for future iterations:**
+  - Dashboard layout uses "use client" since it needs useState for mobile sidebar toggle
+  - Sidebar uses sidebar-* CSS variables from globals.css for consistent theming
+  - Active nav state determined by pathname.startsWith() except for exact /dashboard match
+  - Mobile sidebar uses fixed positioning with transform translate-x for slide animation
+  - User initials extracted by splitting name and taking first char of each part
+  - Logout redirects to "/" using window.location.href
+---
+
+## 2026-01-22 12:15 - US-012
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented
+  - Added alerts context with add, update, delete helpers
+  - Seeded alerts state from mock alerts and persisted changes to localStorage
+  - Wrapped app providers with AlertsProvider
+- Files changed
+  - packages/frontend/src/lib/alerts-context.tsx
+  - packages/frontend/src/components/providers.tsx
+- **Learnings for future iterations:**
+  - Alerts context persists to localStorage key "surf-alerts-alerts" after initial load
+  - useAlerts hook mirrors useAuth pattern and throws if provider is missing
+---
+
+## 2026-01-22 12:32 - US-001
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented
+  - Confirmed frontend scaffold dependencies and quality checks for initial Next.js setup
+  - Adjusted alerts context initialization to satisfy linting guidelines
+- Files changed
+  - packages/frontend/src/lib/alerts-context.tsx
+- **Learnings for future iterations:**
+  - ESLint rule react-hooks/set-state-in-effect requires localStorage reads to be handled in lazy state initialization
+---
+
