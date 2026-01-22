@@ -6,11 +6,22 @@ import { Alert } from "@/lib/mock-data";
 import { AlertCard } from "@/components/alerts/alert-card";
 import { AlertFormModal } from "@/components/alerts/alert-form-modal";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function AlertsPage() {
-  const { alerts } = useAlerts();
+  const { alerts, deleteAlert } = useAlerts();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAlert, setEditingAlert] = useState<Alert | null>(null);
+  const [deletingAlert, setDeletingAlert] = useState<Alert | null>(null);
 
   const handleAddNew = () => {
     setEditingAlert(null);
@@ -23,8 +34,14 @@ export default function AlertsPage() {
   };
 
   const handleDelete = (alert: Alert) => {
-    // TODO: Implement delete confirmation dialog (US-020)
-    console.log("Delete alert:", alert.id);
+    setDeletingAlert(alert);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deletingAlert) {
+      deleteAlert(deletingAlert.id);
+      setDeletingAlert(null);
+    }
   };
 
   return (
@@ -114,6 +131,34 @@ export default function AlertsPage() {
         onOpenChange={setIsModalOpen}
         editingAlert={editingAlert}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deletingAlert}
+        onOpenChange={(open) => !open && setDeletingAlert(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Alert</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the alert for{" "}
+              <span className="font-medium text-foreground">
+                {deletingAlert?.spotName}
+              </span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
