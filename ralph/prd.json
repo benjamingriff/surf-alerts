@@ -1,0 +1,382 @@
+{
+  "project": "SurfAlerts",
+  "branchName": "ralph/frontend-mvp",
+  "description": "Surf Alerts Frontend - Landing page and dashboard for configuring surf condition text alerts",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Initialize Next.js project with dependencies",
+      "description": "As a developer, I need the frontend project scaffolded with Next.js, TypeScript, Tailwind, and shadcn/ui.",
+      "acceptanceCriteria": [
+        "Create packages/frontend directory with Next.js 14+ App Router",
+        "Configure TypeScript and Tailwind CSS",
+        "Initialize shadcn/ui with default theme",
+        "Set up ocean-inspired color palette (blues/teals) in tailwind.config.ts",
+        "Configure Inter font as default sans-serif",
+        "Dev server runs with 'npm run dev'",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Create mock data file with surf spots",
+      "description": "As a developer, I need predefined surf spot data and mock user data for the UI.",
+      "acceptanceCriteria": [
+        "Create src/lib/mock-data.ts with array of surf spots (name, id, region)",
+        "Include at least 15 real Surfline spot names from California",
+        "Add mock user object with name, email, phone fields",
+        "Add mock alerts array structure",
+        "Export TypeScript types for Spot, User, Alert",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Create navigation header component",
+      "description": "As a visitor, I want to see navigation with Login/Sign Up buttons so I can access my account.",
+      "acceptanceCriteria": [
+        "Create src/components/landing/header.tsx",
+        "Display 'Surf Alerts' brand name/logo placeholder on left",
+        "Login and Sign Up buttons on right",
+        "Buttons link to /login and /signup routes",
+        "Header is sticky and responsive",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Create landing page hero section",
+      "description": "As a visitor, I want to understand what Surf Alerts does within seconds of landing on the page.",
+      "acceptanceCriteria": [
+        "Create src/app/page.tsx with hero section",
+        "Clear headline explaining surf alerts value prop",
+        "Subheadline with brief description",
+        "Primary CTA button ('Get Started' linking to /signup)",
+        "Ocean-themed background or imagery placeholder",
+        "Fully responsive (mobile 375px, tablet 768px, desktop 1280px+)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Create 'How it Works' section",
+      "description": "As a visitor, I want to see how the alerting system works so I understand the value.",
+      "acceptanceCriteria": [
+        "Add 'How it Works' section to landing page below hero",
+        "Three-step flow: 1) Pick your spots, 2) Set your threshold, 3) Get text alerts",
+        "Each step has icon/illustration placeholder and brief description",
+        "Clean grid/flex layout with proper spacing",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Create features/benefits section",
+      "description": "As a visitor, I want to see key features so I understand what I get.",
+      "acceptanceCriteria": [
+        "Add features section to landing page",
+        "At least 3 feature cards (e.g., Multiple spots, Rating thresholds, Day selection)",
+        "Each card has icon placeholder, title, and short description",
+        "Modern minimalist card design with subtle shadows",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Create login page UI",
+      "description": "As a visitor, I want a professional login page so I can access my dashboard.",
+      "acceptanceCriteria": [
+        "Create src/app/login/page.tsx",
+        "Email and password input fields using shadcn/ui Input",
+        "Submit button using shadcn/ui Button",
+        "Link to signup page ('Don't have an account? Sign up')",
+        "Centered card layout with clean styling",
+        "Clicking submit navigates to /dashboard (no real auth)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Create signup page UI",
+      "description": "As a visitor, I want a signup page so I can create an account.",
+      "acceptanceCriteria": [
+        "Create src/app/signup/page.tsx",
+        "Email, password, and confirm password fields",
+        "Submit button",
+        "Link to login page ('Already have an account? Log in')",
+        "Basic client-side validation (passwords match, email format)",
+        "Clicking submit navigates to /dashboard (no real auth)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Create mock auth context",
+      "description": "As a developer, I need a mock auth context to simulate logged-in state.",
+      "acceptanceCriteria": [
+        "Create src/lib/auth-context.tsx with React Context",
+        "Provide mock user object (name, email) when 'logged in'",
+        "isAuthenticated boolean state",
+        "login() and logout() functions that toggle state",
+        "Wrap app in AuthProvider",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Create dashboard layout with sidebar",
+      "description": "As a logged-in user, I want a dashboard with sidebar navigation.",
+      "acceptanceCriteria": [
+        "Create src/app/dashboard/layout.tsx",
+        "Fixed sidebar on left with navigation links",
+        "Nav items: Home, Alerts, Settings (phone setup)",
+        "Main content area on right",
+        "Responsive: sidebar collapses to hamburger menu on mobile",
+        "Uses mock auth context to display user name",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Create dashboard home page",
+      "description": "As a logged-in user, I want to see a welcome message and alerts summary.",
+      "acceptanceCriteria": [
+        "Create src/app/dashboard/page.tsx",
+        "Welcome message with user's name from auth context",
+        "Card showing count of active alerts",
+        "Quick action button to create new alert",
+        "Clean dashboard layout using shadcn/ui Card",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Create alerts state management",
+      "description": "As a developer, I need state management for alerts CRUD operations.",
+      "acceptanceCriteria": [
+        "Create src/lib/alerts-context.tsx with React Context",
+        "Store array of Alert objects in state",
+        "Provide addAlert, updateAlert, deleteAlert functions",
+        "Initialize with sample mock alerts",
+        "Persist to localStorage for session continuity",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Create alert card component",
+      "description": "As a user, I want to see my alerts displayed as cards with key info.",
+      "acceptanceCriteria": [
+        "Create src/components/alerts/alert-card.tsx",
+        "Display surf spot name prominently",
+        "Show minimum rating as stars (1-5)",
+        "Show selected days as abbreviated badges (Mon, Tue, etc.)",
+        "Edit and Delete icon buttons in card header",
+        "Uses shadcn/ui Card component",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Create alerts list page",
+      "description": "As a user, I want to view all my configured alerts in a grid.",
+      "acceptanceCriteria": [
+        "Create src/app/dashboard/alerts/page.tsx",
+        "Display grid of AlertCard components",
+        "'Add New Alert' button at top",
+        "Empty state message when no alerts exist",
+        "Responsive grid (1 col mobile, 2 cols tablet, 3 cols desktop)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Create alert form modal - spot and rating",
+      "description": "As a user, I want to select a surf spot and rating when creating an alert.",
+      "acceptanceCriteria": [
+        "Create src/components/alerts/alert-form-modal.tsx using shadcn/ui Dialog",
+        "Dropdown/Select to choose surf spot from mock data list",
+        "Each option shows spot name and region",
+        "Star rating selector (1-5) for minimum threshold",
+        "Clicking stars updates selection visually",
+        "Form state managed with useState",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Add day selection to alert form",
+      "description": "As a user, I want to select which days of the week to receive alerts.",
+      "acceptanceCriteria": [
+        "Add day-of-week checkboxes to alert form modal",
+        "Seven checkboxes: Mon, Tue, Wed, Thu, Fri, Sat, Sun",
+        "Use shadcn/ui Checkbox components",
+        "At least one day must be selected to save",
+        "Checkboxes styled as toggle buttons or chips",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Add text message preview to alert form",
+      "description": "As a user, I want to see a preview of what the text message will look like.",
+      "acceptanceCriteria": [
+        "Add preview section to alert form modal",
+        "Preview updates live as user changes selections",
+        "Show example message: 'Surf Alert: [Spot] is [rating]+ stars today!'",
+        "Styled to look like a text message bubble",
+        "Preview only shows when spot and rating are selected",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Wire up alert creation flow",
+      "description": "As a user, I want to save my alert configuration.",
+      "acceptanceCriteria": [
+        "Add Save button to alert form modal",
+        "Clicking Save calls addAlert from alerts context",
+        "Modal closes after successful save",
+        "New alert appears in alerts list immediately",
+        "Form validation: require spot, rating, and at least one day",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Add edit functionality for alerts",
+      "description": "As a user, I want to edit my existing alerts.",
+      "acceptanceCriteria": [
+        "Clicking Edit on alert card opens form modal pre-filled with alert data",
+        "Modal title changes to 'Edit Alert'",
+        "Save button calls updateAlert from context",
+        "Changes reflected immediately in alert list",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Add delete functionality for alerts",
+      "description": "As a user, I want to delete alerts with a confirmation step.",
+      "acceptanceCriteria": [
+        "Clicking Delete on alert card shows confirmation dialog",
+        "Use shadcn/ui AlertDialog component",
+        "Confirm button calls deleteAlert from context",
+        "Cancel button closes dialog without action",
+        "Alert removed from list immediately after confirm",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Create phone setup settings page",
+      "description": "As a user, I want to add my mobile phone number for text alerts.",
+      "acceptanceCriteria": [
+        "Create src/app/dashboard/settings/page.tsx",
+        "Phone number input field with basic format validation",
+        "Display currently saved number (from mock context)",
+        "Save button that updates mock user context",
+        "Success toast/message when number is 'saved'",
+        "Use shadcn/ui Input and Button",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Add responsive polish and final styling",
+      "description": "As a user, I want all pages to look polished on all screen sizes.",
+      "acceptanceCriteria": [
+        "Test and fix any responsive issues on mobile (375px)",
+        "Test and fix tablet layout (768px)",
+        "Ensure consistent spacing and typography across all pages",
+        "Add subtle hover/focus states to interactive elements",
+        "Landing page achieves 90+ Lighthouse performance score",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
