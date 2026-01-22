@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAlerts } from "@/lib/alerts-context";
 import { Alert } from "@/lib/mock-data";
 import { AlertCard } from "@/components/alerts/alert-card";
+import { AlertFormModal } from "@/components/alerts/alert-form-modal";
 import { Button } from "@/components/ui/button";
 
 export default function AlertsPage() {
@@ -107,7 +108,12 @@ export default function AlertsPage() {
         </div>
       )}
 
-      {/* TODO: Add AlertFormModal component (US-015) */}
+      {/* Alert Form Modal */}
+      <AlertFormModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        editingAlert={editingAlert}
+      />
     </div>
   );
 }
