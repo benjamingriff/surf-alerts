@@ -80,3 +80,39 @@ Started: Thu 22 Jan 2026 11:09:11 GMT
   - persistAlerts helper updates both state and localStorage atomically
   - addAlert generates IDs using `alert-${Date.now()}`
 ---
+
+## 2026-01-22 - US-013
+- What was implemented:
+  - Created src/components/alerts/alert-card.tsx component
+  - Displays surf spot name prominently in CardTitle
+  - StarRating component shows filled/unfilled stars (1-5) using amber color
+  - DayBadge component shows each day as a badge (active days use primary/10 bg)
+  - Edit and Delete icon buttons in CardAction using ghost variant icon-sm size
+  - Inactive alerts have opacity-60 styling
+  - Uses SVG icons for edit (pencil) and delete (trash)
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/components/alerts/alert-card.tsx (new file)
+- **Learnings for future iterations:**
+  - AlertCard takes onEdit and onDelete callbacks for parent component to handle actions
+  - StarRating uses amber-400 for filled stars, muted-foreground/30 for empty
+  - DayBadge shows ALL_DAYS array to indicate which are selected vs not
+  - Button size="icon-sm" (h-8 w-8) works well for card header actions
+---
+
+## 2026-01-22 - US-014
+- What was implemented:
+  - Created src/app/dashboard/alerts/page.tsx for alerts list
+  - Displays grid of AlertCard components using useAlerts() context
+  - "Add New Alert" button at top of page with plus icon
+  - Empty state with bell icon and helpful message when no alerts exist
+  - Responsive grid: 1 col mobile (default), 2 cols sm, 3 cols lg
+  - State management for modal open/close and editing alert
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/app/dashboard/alerts/page.tsx (new file)
+- **Learnings for future iterations:**
+  - AlertsPage uses useState for isModalOpen and editingAlert to prepare for modal integration (US-015)
+  - Empty state design: flex-col items-center with border-dashed, icon, heading, and CTA button
+  - Grid classes: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3" for responsive layout
+---
