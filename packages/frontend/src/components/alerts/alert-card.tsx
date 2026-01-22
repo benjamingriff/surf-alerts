@@ -58,7 +58,7 @@ const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export function AlertCard({ alert, onEdit, onDelete }: AlertCardProps) {
   return (
-    <Card className={alert.isActive ? "" : "opacity-60"}>
+    <Card className={`transition-shadow hover:shadow-md ${alert.isActive ? "" : "opacity-60"}`}>
       <CardHeader>
         <CardTitle className="text-lg">{alert.spotName}</CardTitle>
         <CardAction className="flex gap-1">

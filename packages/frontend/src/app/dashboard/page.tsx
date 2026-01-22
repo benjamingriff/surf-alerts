@@ -29,7 +29,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Active Alerts Card */}
         <Card>
           <CardHeader className="pb-2">
@@ -162,7 +162,7 @@ export default function DashboardPage() {
               {activeAlerts.slice(0, 3).map((alert) => (
                 <div
                   key={alert.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
+                  className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
                 >
                   <div>
                     <p className="font-medium">{alert.spotName}</p>

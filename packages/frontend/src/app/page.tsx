@@ -43,11 +43,11 @@ export default function Home() {
               </p>
 
               {/* CTA Button */}
-              <div className="mt-10 flex items-center justify-center gap-4">
-                <Button asChild size="lg" className="text-base px-8 py-6">
+              <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
+                <Button asChild size="lg" className="w-full text-base px-8 py-6 sm:w-auto">
                   <Link href="/signup">Get Started</Link>
                 </Button>
-                <Button asChild variant="outline" size="lg" className="text-base px-8 py-6">
+                <Button asChild variant="outline" size="lg" className="w-full text-base px-8 py-6 sm:w-auto">
                   <Link href="#how-it-works">Learn More</Link>
                 </Button>
               </div>
@@ -175,7 +175,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-8">
               {/* Feature 1: Multiple Spots */}
               <div className="rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">

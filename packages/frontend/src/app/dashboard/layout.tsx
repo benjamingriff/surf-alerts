@@ -80,13 +80,13 @@ function Sidebar({
     <div className="flex h-full flex-col bg-sidebar">
       {/* Logo / Brand */}
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-        <Link href="/dashboard" className="text-xl font-bold text-primary">
+        <Link href="/dashboard" className="text-xl font-bold text-primary transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded">
           Surf Alerts
         </Link>
         {isMobile && onClose && (
           <button
             onClick={onClose}
-            className="rounded-md p-2 text-sidebar-foreground hover:bg-sidebar-accent"
+            className="rounded-md p-2 text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Close menu"
           >
             <svg
@@ -119,7 +119,7 @@ function Sidebar({
               key={item.href}
               href={item.href}
               onClick={onClose}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -207,7 +207,7 @@ export default function DashboardLayout({
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-background px-4 md:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="rounded-md p-2 text-foreground hover:bg-muted"
+            className="rounded-md p-2 text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Open menu"
           >
             <svg
