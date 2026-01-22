@@ -8,7 +8,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useAlerts } from "@/lib/alerts-context";
 import {
   Select,
   SelectContent,
@@ -136,12 +139,36 @@ export function AlertFormModal({
   onOpenChange,
   editingAlert,
 }: AlertFormModalProps) {
+  const { addAlert, updateAlert } = useAlerts();
   const [selectedSpotId, setSelectedSpotId] = useState("");
   const [minRating, setMinRating] = useState(0);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
 
   const spotsByRegion = getSpotsByRegion();
   const selectedSpot = surfSpots.find((s) => s.id === selectedSpotId);
+
+  // Form validation
+  const isValid = selectedSpotId !== "" && minRating > 0 && selectedDays.length > 0;
+
+  const handleSave = () => {
+    if (!isValid || !selectedSpot) return;
+
+    const alertData = {
+      spotId: selectedSpotId,
+      spotName: selectedSpot.name,
+      minRating,
+      days: selectedDays,
+      isActive: true,
+    };
+
+    if (editingAlert) {
+      updateAlert(editingAlert.id, alertData);
+    } else {
+      addAlert(alertData);
+    }
+
+    onOpenChange(false);
+  };
 
   // Reset form when modal opens/closes or when editing alert changes
   useEffect(() => {
@@ -245,6 +272,15 @@ export function AlertFormModal({
             </div>
           )}
         </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!isValid}>
+            {isEditing ? "Save Changes" : "Create Alert"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
