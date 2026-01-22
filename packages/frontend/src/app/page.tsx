@@ -162,6 +162,178 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Features Section */}
+        <section className="py-16 sm:py-24">
+          <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                Everything You Need
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Powerful features to keep you in the water when conditions are prime
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {/* Feature 1: Multiple Spots */}
+              <div className="rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="h-6 w-6"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Multiple Spots
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Monitor as many surf breaks as you want. Get alerts for all your favorite spots without having to check each one manually.
+                </p>
+              </div>
+
+              {/* Feature 2: Rating Thresholds */}
+              <div className="rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="h-6 w-6"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Rating Thresholds
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Set your minimum surf rating from 1-5 stars. Only get notified when conditions meet your personal standard.
+                </p>
+              </div>
+
+              {/* Feature 3: Day Selection */}
+              <div className="rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="h-6 w-6"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Day Selection
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Choose which days of the week you want to receive alerts. Perfect for weekend warriors or those with flexible schedules.
+                </p>
+              </div>
+
+              {/* Feature 4: Instant SMS */}
+              <div className="rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="h-6 w-6"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Instant SMS
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Receive alerts directly to your phone via text message. No app to download or notifications to enable.
+                </p>
+              </div>
+
+              {/* Feature 5: Real-time Data */}
+              <div className="rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="h-6 w-6"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Real-time Data
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Powered by Surfline forecasts, we check conditions daily to ensure you get accurate, up-to-date alerts.
+                </p>
+              </div>
+
+              {/* Feature 6: Easy Setup */}
+              <div className="rounded-xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="h-6 w-6"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Easy Setup
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Create your alerts in minutes. Simple interface to configure exactly what conditions you want to be notified about.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   );
