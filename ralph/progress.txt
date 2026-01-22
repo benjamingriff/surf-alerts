@@ -63,3 +63,20 @@ Started: Thu 22 Jan 2026 11:09:11 GMT
   - Icon containers: h-12 w-12 rounded-lg bg-primary/10 text-primary for feature cards
   - Alternating section backgrounds (white, muted/30, white) creates visual hierarchy
 ---
+
+## 2026-01-22 - US-012
+- What was implemented:
+  - Created src/lib/alerts-context.tsx with React Context for alerts CRUD
+  - Added AlertsProvider to providers.tsx
+  - Store array of Alert objects with addAlert, updateAlert, deleteAlert functions
+  - Uses lazy state initialization with getInitialAlerts() to seed localStorage on first load
+  - Persists alerts to localStorage with STORAGE_KEY "surf-alerts-data"
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/lib/alerts-context.tsx (new file)
+  - packages/frontend/src/components/providers.tsx (added AlertsProvider)
+- **Learnings for future iterations:**
+  - Use lazy state initialization (`useState(getInitialAlerts)`) to avoid hydration issues with localStorage
+  - persistAlerts helper updates both state and localStorage atomically
+  - addAlert generates IDs using `alert-${Date.now()}`
+---
