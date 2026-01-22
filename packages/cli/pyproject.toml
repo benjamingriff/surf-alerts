@@ -7,6 +7,8 @@ dependencies = [
     "typer>=0.9.0",
     "rich>=14.0.0",
     "forecast-scraper",
+    "sitemap-scraper",
+    "taxonomy-scraper",
 ]
 
 [project.scripts]
@@ -14,6 +16,8 @@ sample = "cli.main:app"
 
 [tool.uv.sources]
 forecast-scraper = { workspace = true }
+sitemap-scraper = { workspace = true }
+taxonomy-scraper = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.9.14,<0.10.0"]
