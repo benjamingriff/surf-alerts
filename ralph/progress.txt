@@ -12,6 +12,9 @@ Started: Thu 22 Jan 2026 11:09:11 GMT
 - Alerts context lives in `src/lib/alerts-context.tsx` and is provided via `src/components/providers.tsx`
 - Alerts context uses lazy state initialization to seed localStorage data without useEffect setState
 - Signup form validation uses field-level error state with aria-invalid and text-destructive styles
+- Focus-visible states: focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+- Card hover: transition-shadow hover:shadow-md
+- Responsive grids: sm:grid-cols-2 for tablet, lg:grid-cols-3 for desktop
 
 
 ## 2026-01-22 - US-001
@@ -115,4 +118,174 @@ Started: Thu 22 Jan 2026 11:09:11 GMT
   - AlertsPage uses useState for isModalOpen and editingAlert to prepare for modal integration (US-015)
   - Empty state design: flex-col items-center with border-dashed, icon, heading, and CTA button
   - Grid classes: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3" for responsive layout
+---
+
+## 2026-01-22 - US-015
+- What was implemented:
+  - Created src/components/alerts/alert-form-modal.tsx using shadcn/ui Dialog
+  - Added shadcn/ui Dialog and Select components to the project
+  - Dropdown/Select shows surf spots grouped by region using SelectGroup and SelectLabel
+  - StarRatingSelector component with hover preview and click-to-select interaction
+  - Form state managed with useState, resets when modal opens/closes
+  - Modal supports both create and edit modes via editingAlert prop
+  - Integrated modal into alerts page (triggered by Add New Alert and Edit buttons)
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/components/alerts/alert-form-modal.tsx (new file)
+  - packages/frontend/src/components/ui/dialog.tsx (shadcn/ui component)
+  - packages/frontend/src/components/ui/select.tsx (shadcn/ui component)
+  - packages/frontend/src/app/dashboard/alerts/page.tsx (integrated modal)
+  - packages/frontend/package.json (added radix dependencies)
+- **Learnings for future iterations:**
+  - Use getSpotsByRegion() Map to group spots for SelectGroup display
+  - StarRatingSelector uses hoverRating state for preview, separate from selected rating
+  - useEffect with [open, editingAlert] deps resets form when modal opens
+  - Dialog content uses sm:max-w-md for mobile-friendly modal width
+---
+
+## 2026-01-22 - US-016
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Added DaySelector component to alert-form-modal.tsx
+  - Seven toggle buttons (Mon-Sun) styled as chips with bg-primary when selected
+  - Added selectedDays state to form, synced with editingAlert when editing
+  - Created shadcn/ui Checkbox component (checkbox.tsx) for future use
+  - Installed @radix-ui/react-checkbox dependency
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/components/alerts/alert-form-modal.tsx (added DaySelector)
+  - packages/frontend/src/components/ui/checkbox.tsx (new file)
+  - packages/frontend/package.json (added radix-checkbox)
+- **Learnings for future iterations:**
+  - DaySelector uses toggle button pattern (role="checkbox") styled as chips
+  - ALL_DAYS const array with "as const" for type-safe day abbreviations
+  - Toggle button styling: bg-primary text-primary-foreground (selected) vs bg-muted text-muted-foreground (unselected)
+---
+
+## 2026-01-22 - US-017
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Added text message preview section to alert-form-modal.tsx
+  - Preview shows "🏄 Surf Alert: [Spot] is [rating]+ stars today!" format
+  - Preview styled as SMS bubble: rounded-2xl rounded-bl-md bg-primary text-primary-foreground
+  - Only displays when both spot and rating are selected (conditional rendering)
+  - Preview updates live as user changes spot/rating selections
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/components/alerts/alert-form-modal.tsx (added Message Preview section)
+- **Learnings for future iterations:**
+  - SMS bubble styling: rounded-2xl with rounded-bl-md for speech bubble effect, max-w-[85%] for realistic width
+  - selectedSpot is already derived from surfSpots using selectedSpotId, making live preview updates automatic
+  - Preview conditionally renders using `{selectedSpot && minRating > 0 && (...)}`
+---
+
+## 2026-01-22 - US-018
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Added Save button and form submission logic to alert-form-modal.tsx
+  - Added DialogFooter with Cancel and Create Alert/Save Changes buttons
+  - Form validation: requires spot, rating (>0), and at least one day selected
+  - handleSave function calls addAlert or updateAlert from context depending on edit mode
+  - Modal closes after successful save via onOpenChange(false)
+  - Save button is disabled until form is valid using `disabled={!isValid}`
+  - Verified typecheck passes
+- Files changed:
+  - packages/frontend/src/components/alerts/alert-form-modal.tsx (added DialogFooter, form validation, save handler)
+- **Learnings for future iterations:**
+  - Form validation pattern: compute `isValid` boolean and use for disabled button and early return
+  - Modal already supports edit mode via editingAlert prop, so handleSave can branch on isEditing
+  - Alert data shape must include spotName (denormalized) along with spotId for display purposes
+---
+
+## 2026-01-22 - US-019
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Verified that edit functionality was already fully implemented in US-015 and US-018
+  - Edit button on AlertCard triggers handleEdit which sets editingAlert state and opens modal
+  - AlertFormModal pre-fills form fields via useEffect when editingAlert prop is set
+  - Modal title displays "Edit Alert" when isEditing is true
+  - Save button calls updateAlert from context when editing existing alert
+  - Changes reflect immediately due to React context state management
+  - Typecheck passes
+- Files already implemented:
+  - packages/frontend/src/components/alerts/alert-form-modal.tsx:174-186 (pre-fill logic)
+  - packages/frontend/src/components/alerts/alert-form-modal.tsx:194-195 (title change)
+  - packages/frontend/src/components/alerts/alert-form-modal.tsx:164-165 (updateAlert call)
+  - packages/frontend/src/app/dashboard/alerts/page.tsx:20-23 (handleEdit function)
+  - packages/frontend/src/components/alerts/alert-card.tsx:68 (edit button onClick)
+- **Learnings for future iterations:**
+  - Edit functionality was built into the modal from the start via editingAlert prop pattern
+  - When verifying story completion, check if functionality was implemented incrementally in earlier stories
+---
+
+## 2026-01-22 - US-020
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Added delete confirmation dialog to alerts page using shadcn/ui AlertDialog
+  - Clicking Delete on AlertCard sets deletingAlert state to open the dialog
+  - Dialog shows spot name in confirmation message
+  - Cancel button closes dialog without action (via onOpenChange)
+  - Confirm button calls deleteAlert from context and closes dialog
+  - Delete button styled with destructive variant (bg-destructive)
+  - Alert removed from list immediately after confirm
+  - Typecheck passes
+- Files changed:
+  - packages/frontend/src/components/ui/alert-dialog.tsx (new shadcn/ui component)
+  - packages/frontend/src/app/dashboard/alerts/page.tsx (added AlertDialog and delete handlers)
+  - packages/frontend/package.json (added @radix-ui/react-alert-dialog)
+- **Learnings for future iterations:**
+  - AlertDialog uses controlled open state via `open={!!deletingAlert}` pattern
+  - onOpenChange callback uses `(open) => !open && setDeletingAlert(null)` to only clear on close
+  - Destructive button styling: bg-destructive text-destructive-foreground hover:bg-destructive/90
+---
+
+## 2026-01-22 - US-021
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Created src/app/dashboard/settings/page.tsx with phone number settings
+  - Added updatePhone function to auth-context.tsx to update user phone
+  - Phone input with basic format validation (accepts various formats, validates 10-15 digits)
+  - Displays currently saved number in a "Current number" panel
+  - Save button calls updatePhone from auth context
+  - Inline success message (green banner) when phone number is saved successfully
+  - Uses shadcn/ui Input, Button, Card components
+  - Typecheck passes
+- Files changed:
+  - packages/frontend/src/lib/auth-context.tsx (added updatePhone function)
+  - packages/frontend/src/app/dashboard/settings/page.tsx (new file)
+- **Learnings for future iterations:**
+  - Auth context needs modification to support updating user fields (e.g., updatePhone)
+  - Phone validation uses regex for format and digit count check (10-15 digits)
+  - Success feedback can be inline (green banner) instead of toast for simple cases
+  - Settings page follows same Card pattern as dashboard for consistency
+---
+
+## 2026-01-22 - US-022
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- What was implemented:
+  - Improved mobile responsiveness: Hero CTA buttons now stack vertically on small screens (flex-col sm:flex-row)
+  - Better tablet layouts: Features grid uses sm:grid-cols-2 for 2-column tablet layout
+  - Stats cards use sm:grid-cols-2 for proper tablet display
+  - Added hover/focus states to interactive elements throughout the app
+  - Alert cards now have transition-shadow hover:shadow-md effect
+  - Dashboard alert previews have transition-colors hover:bg-muted/50
+  - Landing header brand link has transition-opacity hover:opacity-80
+  - Sidebar navigation links have focus-visible:ring-2 for keyboard accessibility
+  - Login/signup page links have focus-visible:ring-2 for keyboard navigation
+  - Mobile hamburger and close buttons have focus-visible ring states
+  - Typecheck passes
+- Files changed:
+  - packages/frontend/src/app/page.tsx (CTA buttons stacking, features grid responsive)
+  - packages/frontend/src/app/dashboard/page.tsx (stats grid responsive, alert hover)
+  - packages/frontend/src/app/dashboard/layout.tsx (focus states for nav links and buttons)
+  - packages/frontend/src/app/login/page.tsx (focus state for signup link)
+  - packages/frontend/src/app/signup/page.tsx (focus state for login link)
+  - packages/frontend/src/components/alerts/alert-card.tsx (hover shadow transition)
+  - packages/frontend/src/components/landing/header.tsx (brand link hover)
+- **Learnings for future iterations:**
+  - Mobile-first approach: Use flex-col then sm:flex-row for stacking CTAs
+  - For grids, sm:grid-cols-2 provides good tablet layout before lg:grid-cols-3
+  - Focus-visible states pattern: focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+  - Card hover pattern: transition-shadow hover:shadow-md
+  - Link hover pattern: transition-opacity hover:opacity-80 for brand links
 ---
