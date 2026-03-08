@@ -4,6 +4,7 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as events from "aws-cdk-lib/aws-events";
 import { Construct } from "constructs";
 import { ScheduledScraper } from "./constructs/scheduled-scraper";
+import { ScraperWorker } from "./constructs/scraper";
 
 export class InfrastructureStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -19,55 +20,73 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     // Sitemap scraper - runs daily at 06:00 UTC
-    new ScheduledScraper(this, "SitemapScraperConstruct", {
-      projectName: this.stackName,
-      scraperName: "sitemap-scraper",
-      codePath: path.join(
-        codebuildSrcDir,
-        "..",
-        "packages",
-        "scrapers",
-        "sitemap_scraper",
-      ),
-      timeout: 60,
-      memorySize: 1024,
-      schedule: events.Schedule.cron({ hour: "6", minute: "0" }),
-      bucket: dataBucket,
-    });
+    // new ScheduledScraper(this, "SitemapScraperConstruct", {
+    //   projectName: this.stackName,
+    //   scraperName: "sitemap-scraper",
+    //   codePath: path.join(
+    //     codebuildSrcDir,
+    //     "..",
+    //     "packages",
+    //     "scrapers",
+    //     "sitemap_scraper",
+    //   ),
+    //   timeout: 60,
+    //   memorySize: 1024,
+    //   schedule: events.Schedule.cron({ hour: "6", minute: "0" }),
+    //   bucket: dataBucket,
+    // });
 
     // Taxonomy scraper - runs daily at 06:00 UTC (parallel with sitemap)
     // Longer timeout for recursive API calls
-    new ScheduledScraper(this, "TaxonomyScraperConstruct", {
+    // new ScheduledScraper(this, "TaxonomyScraperConstruct", {
+    //   projectName: this.stackName,
+    //   scraperName: "taxonomy-scraper",
+    //   codePath: path.join(
+    //     codebuildSrcDir,
+    //     "..",
+    //     "packages",
+    //     "scrapers",
+    //     "taxonomy_scraper",
+    //   ),
+    //   timeout: 600, // 10 minutes for recursive scraping
+    //   memorySize: 1024,
+    //   schedule: events.Schedule.cron({ hour: "6", minute: "0" }),
+    //   bucket: dataBucket,
+    // });
+
+    // Spot reconciler - runs daily at 06:15 UTC (after scrapers complete)
+    // new ScheduledScraper(this, "SpotReconcilerConstruct", {
+    //   projectName: this.stackName,
+    //   scraperName: "spot-reconciler",
+    //   codePath: path.join(
+    //     codebuildSrcDir,
+    //     "..",
+    //     "packages",
+    //     "jobs",
+    //     "spot_reconciler",
+    //   ),
+    //   timeout: 120,
+    //   memorySize: 1024,
+    //   schedule: events.Schedule.cron({ hour: "6", minute: "15" }),
+    //   bucket: dataBucket,
+    // });
+
+    // Spot scraper - SQS triggered, processes individual spots from taxonomy API
+    const spotScraper = new ScraperWorker(this, "SpotScraperConstruct", {
       projectName: this.stackName,
-      scraperName: "taxonomy-scraper",
+      scraperName: "spot-scraper",
       codePath: path.join(
         codebuildSrcDir,
         "..",
         "packages",
         "scrapers",
-        "taxonomy_scraper",
+        "spot_scraper",
       ),
-      timeout: 600, // 10 minutes for recursive scraping
+      timeout: 60,
       memorySize: 1024,
-      schedule: events.Schedule.cron({ hour: "6", minute: "0" }),
-      bucket: dataBucket,
+      maxConcurrency: 5,
     });
 
-    // Spot reconciler - runs daily at 06:15 UTC (after scrapers complete)
-    new ScheduledScraper(this, "SpotReconcilerConstruct", {
-      projectName: this.stackName,
-      scraperName: "spot-reconciler",
-      codePath: path.join(
-        codebuildSrcDir,
-        "..",
-        "packages",
-        "jobs",
-        "spot_reconciler",
-      ),
-      timeout: 120,
-      memorySize: 1024,
-      schedule: events.Schedule.cron({ hour: "6", minute: "15" }),
-      bucket: dataBucket,
-    });
+    dataBucket.grantReadWrite(spotScraper.lambdaFunction);
   }
 }
