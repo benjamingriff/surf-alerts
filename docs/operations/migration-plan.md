@@ -1,27 +1,8 @@
-# Forecast Data Migration Plan
+# Migration Plan
 
-This document describes the plan for migrating 1TB+ of legacy forecast JSON data to the new Parquet archive format.
+> **Status: PLANNED** | Not yet started
 
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Current vs Target Structure](#current-vs-target-structure)
-3. [S3 Inventory Setup](#s3-inventory-setup)
-4. [Cost Breakdown](#cost-breakdown)
-5. [Implementation Plan](#implementation-plan)
-6. [Checkpoint & Resume](#checkpoint--resume)
-7. [Handling Edge Cases](#handling-edge-cases)
-8. [Parquet Transformations](#parquet-transformations)
-9. [Files to Create](#files-to-create)
-10. [Verification Steps](#verification-steps)
-
----
-
-## Overview
-
-Migrate 1TB+ of uncompressed JSON surf forecast data from the legacy bucket directly to Parquet archive format.
+Migrate 1TB+ of legacy forecast JSON data to the new Parquet archive format.
 
 | Metric | Value |
 |--------|-------|
@@ -70,7 +51,9 @@ s3://surf-alerts-data/forecasts/archive/
     dim_sunlight.parquet
 ```
 
-**Scrape timestamp**: Derived from date folder as `{date}T00:00:00Z`
+**Scrape timestamp**: Derived from date folder as `{date}T00:00:00Z` (known limitation — original scrape times not preserved for legacy data).
+
+**Important:** Tide heights should be stored in feet and `rating_value` should use `FLOAT64` type — see [Forecast Schema](../data/forecast-schema.md) for full table definitions.
 
 ---
 
@@ -209,7 +192,7 @@ Once migration is complete:
 **For each month (oldest to newest):**
 
 1. Parse S3 Inventory to find all files for that month
-2. Group by date → spot_id → endpoint
+2. Group by date -> spot_id -> endpoint
 3. For each spot-day:
    - GET all 6 endpoint JSON files (handle missing gracefully)
    - Transform to PyArrow record batches
@@ -245,7 +228,7 @@ for year_month in sorted(all_months):  # "2023-01", "2023-02", ...
 
 **Memory management:**
 - Process one month at a time
-- ~10K spots × 30 days × ~1KB per spot-day = ~300MB per table in memory
+- ~10K spots x 30 days x ~1KB per spot-day = ~300MB per table in memory
 - 16GB RAM handles this comfortably
 
 ### Phase 2: Validation (Day 5-6)
@@ -260,7 +243,7 @@ for year_month in sorted(all_months):  # "2023-01", "2023-02", ...
 
 3. **Schema validation**:
    - Query each Parquet file with DuckDB
-   - Verify column types match forecast-data-model.md
+   - Verify column types match [Forecast Schema](../data/forecast-schema.md)
 
 ### Phase 3: Cleanup (Day 7+)
 
@@ -322,7 +305,7 @@ signal.signal(signal.SIGTERM, handle_spot_interruption)
 
 ## Parquet Transformations
 
-Per `forecast-data-model.md`, transform each endpoint JSON to rows:
+Per the [Forecast Schema](../data/forecast-schema.md), transform each endpoint JSON to rows:
 
 | Table | Rows per scrape | Key transformations |
 |-------|-----------------|---------------------|
@@ -373,9 +356,3 @@ After migration completes:
    - fact_weather: 384
    - fact_tides: 168
    - dim_sunlight: 16
-
----
-
-## Related Documents
-
-- [Forecast Data Model](./forecast-data-model.md) - Target schema definitions and transformation mappings
