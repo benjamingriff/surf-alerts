@@ -41,7 +41,7 @@ Surfline API
 
 **Units requested:** `swellHeight=FT`, `waveHeight=FT`, `windSpeed=MPH`, `temperature=C`, `tideHeight=M`
 
-> **Note:** Tides are currently scraped in meters. Planned change: switch to `tideHeight=FT` to match the [Forecast Schema](../data/forecast-schema.md) which specifies feet.
+> **Note:** Tides are currently scraped in meters. Planned change: switch to `tideHeight=FT` to match the [Forecast Schema](../data_architecture/forecast-schema.md) which specifies feet.
 
 ### Spot Scraper Flow
 
@@ -84,7 +84,7 @@ S3 (Raw JSON)
                   (REST API)
 ```
 
-See [Forecast Schema](../data/forecast-schema.md) for the Parquet table definitions and [API Design](../api/README.md) for the planned API.
+See [Forecast Schema](../data_architecture/forecast-schema.md) for the Parquet table definitions and [API Design](../api/README.md) for the planned API.
 
 ## Error Handling
 

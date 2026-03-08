@@ -24,7 +24,7 @@ Personal surf forecast data platform. Scrapes forecast data from Surfline, store
 - [Architecture Overview](architecture/README.md) — how the system fits together
 - [Scraper Pattern](scrapers/README.md) — shared module structure for all scrapers
 - [Surfline API Reference](surfline/README.md) — all discovered Surfline endpoints
-- [Forecast Schema](data/forecast-schema.md) — Parquet star schema design
+- [Forecast Schema](data_architecture/forecast-schema.md) — Parquet star schema design
 - [API Design](api/README.md) — planned REST API spec
 
 ## Project Structure

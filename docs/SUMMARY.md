@@ -16,12 +16,12 @@
 * [Sitemap Scraper](scrapers/sitemap-scraper.md)
 * [Taxonomy Scraper](scrapers/taxonomy-scraper.md)
 
-## Data
+## Data Architecture
 
-* [Data Layer Overview](data/README.md)
-* [Forecast Schema](data/forecast-schema.md)
-* [Forecast Transformations](data/forecast-transformations.md)
-* [Forecast Queries](data/forecast-queries.md)
+* [Data Layer Overview](data_architecture/README.md)
+* [Forecast Schema](data_architecture/forecast-schema.md)
+* [Forecast Transformations](data_architecture/forecast-transformations.md)
+* [Forecast Queries](data_architecture/forecast-queries.md)
 
 ## API
 

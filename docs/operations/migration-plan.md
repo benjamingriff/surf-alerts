@@ -53,7 +53,7 @@ s3://surf-alerts-data/forecasts/archive/
 
 **Scrape timestamp**: Derived from date folder as `{date}T00:00:00Z` (known limitation — original scrape times not preserved for legacy data).
 
-**Important:** Tide heights should be stored in feet and `rating_value` should use `FLOAT64` type — see [Forecast Schema](../data/forecast-schema.md) for full table definitions.
+**Important:** Tide heights should be stored in feet and `rating_value` should use `FLOAT64` type — see [Forecast Schema](../data_architecture/forecast-schema.md) for details.
 
 ---
 
@@ -243,7 +243,7 @@ for year_month in sorted(all_months):  # "2023-01", "2023-02", ...
 
 3. **Schema validation**:
    - Query each Parquet file with DuckDB
-   - Verify column types match [Forecast Schema](../data/forecast-schema.md)
+   - Verify column types match [Forecast Schema](../data_architecture/forecast-schema.md)
 
 ### Phase 3: Cleanup (Day 7+)
 
@@ -305,7 +305,7 @@ signal.signal(signal.SIGTERM, handle_spot_interruption)
 
 ## Parquet Transformations
 
-Per the [Forecast Schema](../data/forecast-schema.md), transform each endpoint JSON to rows:
+Per the [Forecast Schema](../data_architecture/forecast-schema.md), transform each endpoint JSON to rows:
 
 | Table | Rows per scrape | Key transformations |
 |-------|-----------------|---------------------|

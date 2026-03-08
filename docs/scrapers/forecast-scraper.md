@@ -17,7 +17,7 @@ Scrapes 6 Surfline forecast endpoints for a single spot per invocation. SQS-trig
 | `/kbyg/spots/forecasts/weather` | 16 | Hourly | `temperature=C` |
 | `/kbyg/spots/forecasts/wind` | 5 | Hourly | `windSpeed=MPH` |
 
-> **Note:** Tides are currently scraped in meters. Planned change to feet — see [Forecast Schema](../data/forecast-schema.md).
+> **Note:** Tides are currently scraped in meters. Planned change to feet — see [Forecast Schema](../data_architecture/forecast-schema.md) for details.
 
 ## How It Works
 
