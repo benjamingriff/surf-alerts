@@ -1,3 +1,6 @@
+# Agent files
+.claude/
+
 # Sampled data
 data/
 
