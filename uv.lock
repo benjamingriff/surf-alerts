@@ -10,6 +10,7 @@ members = [
     "forecast-scraper",
     "sitemap-scraper",
     "spot-reconciler",
+    "spot-scraper",
     "surf-alerts",
     "taxonomy-scraper",
 ]
@@ -864,6 +865,23 @@ requires-dist = [
 ]
 
 [[package]]
+name = "spot-scraper"
+version = "0.1.0"
+source = { editable = "packages/scrapers/spot_scraper" }
+dependencies = [
+    { name = "aws-lambda-powertools" },
+    { name = "boto3" },
+    { name = "curl-cffi" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
+    { name = "boto3", specifier = ">=1.42.15" },
+    { name = "curl-cffi", specifier = ">=0.14.0" },
+]
+
+[[package]]
 name = "surf-alerts"
 version = "0.1.0"
 source = { virtual = "." }
@@ -877,6 +895,7 @@ dev = [
     { name = "rich" },
     { name = "sitemap-scraper" },
     { name = "spot-reconciler" },
+    { name = "spot-scraper" },
     { name = "taxonomy-scraper" },
 ]
 
@@ -891,6 +910,7 @@ dev = [
     { name = "rich", specifier = ">=14.2.0" },
     { name = "sitemap-scraper", editable = "packages/scrapers/sitemap_scraper" },
     { name = "spot-reconciler", editable = "packages/jobs/spot_reconciler" },
+    { name = "spot-scraper", editable = "packages/scrapers/spot_scraper" },
     { name = "taxonomy-scraper", editable = "packages/scrapers/taxonomy_scraper" },
 ]
 

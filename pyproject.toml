@@ -15,6 +15,7 @@ members = [
     "packages/scrapers/forecast_scraper",
     "packages/scrapers/sitemap_scraper",
     "packages/scrapers/taxonomy_scraper",
+    "packages/scrapers/spot_scraper",
 ]
 
 [tool.uv.sources]
@@ -23,6 +24,7 @@ forecast-scraper = { workspace = true }
 sitemap-scraper = { workspace = true }
 taxonomy-scraper = { workspace = true }
 spot-reconciler = { workspace = true }
+spot-scraper = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -31,6 +33,7 @@ dev = [
     "sitemap-scraper",
     "taxonomy-scraper",
     "spot-reconciler",
+    "spot-scraper",
     "moto>=5.1.19",
     "pytest>=9.0.2",
     "rich>=14.2.0",
