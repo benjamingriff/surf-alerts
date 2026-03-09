@@ -1,13 +1,13 @@
 [project]
-name = "spot-report-processor"
+name = "discovery-catalog-builder"
 version = "0.1.0"
-description = "Processes raw spot reports into discovery version tables"
+description = "Rebuilds the discovery catalog latest snapshot from discovery history tables"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aws-lambda-powertools>=3.23.0",
     "boto3>=1.42.15",
-    "pyarrow>=23.0.0",
+    "pyarrow>=21.0.0",
 ]
 
 [build-system]

@@ -19,4 +19,4 @@ COPY ./src ${LAMBDA_TASK_ROOT}/src
 
 ENV PYTHONPATH="${LAMBDA_TASK_ROOT}:${LAMBDA_TASK_ROOT}/src:${PYTHONPATH}"
 
-CMD ["catalog_builder.handler.lambda_handler"]
+CMD ["discovery_catalog_builder.handler.lambda_handler"]

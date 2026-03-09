@@ -19,4 +19,4 @@ COPY ./src ${LAMBDA_TASK_ROOT}/src
 
 ENV PYTHONPATH="${LAMBDA_TASK_ROOT}:${LAMBDA_TASK_ROOT}/src:${PYTHONPATH}"
 
-CMD ["spot_report_processor.handler.lambda_handler"]
+CMD ["discovery_spot_history_processor.handler.lambda_handler"]

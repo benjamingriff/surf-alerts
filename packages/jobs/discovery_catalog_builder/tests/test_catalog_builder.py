@@ -5,7 +5,7 @@ import json
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from catalog_builder.handler import lambda_handler
+from discovery_catalog_builder.handler import lambda_handler
 
 
 def _write_json(s3_client, bucket: str, key: str, body: dict) -> None:
@@ -30,17 +30,22 @@ def _event(bucket: str, key: str) -> dict:
 
 def test_catalog_builder_rebuilds_latest_snapshot_from_history(s3, lambda_context):
     bucket = "dataeng-squeegee-test-bucket"
-    manifest_key = "control/manifests/processing/domain=discovery/date=2026-03-09/run_id=run-1.json.gz"
+    manifest_key = (
+        "control/manifests/processing/domain=discovery/stage=catalog_build/"
+        "date=2026-03-09/discovery_run_id=run-1.json.gz"
+    )
     _write_json(
         s3,
         bucket,
         manifest_key,
         {
             "schema_version": 1,
+            "manifest_type": "processing_manifest",
             "domain": "discovery",
+            "stage": "catalog_build",
             "discovery_run_id": "run-1",
             "scrape_date": "2026-03-09",
-            "source_manifest_key": "control/manifests/discovery_runs/date=2026-03-09/run_id=run-1.json.gz",
+            "source_manifest_key": "control/manifests/processing/domain=discovery/stage=spot_history/date=2026-03-09/discovery_run_id=run-1.json.gz",
             "source_keys": [],
             "ready_at": "2026-03-09T06:10:00+00:00",
         },
@@ -48,13 +53,13 @@ def test_catalog_builder_rebuilds_latest_snapshot_from_history(s3, lambda_contex
     _write_parquet(
         s3,
         bucket,
-        "processed/discovery/dim_spots_core/year=2026/month=03/part-1.parquet",
+        "processed/discovery/dim_spots_core/year=2026/month=03/discovery_run_id=run-0.parquet",
         [
             {
                 "spot_version_id": "v1",
                 "spot_id": "a",
                 "version_ts": "2026-03-09T06:01:00+00:00",
-                "content_checksum": "abc",
+                "content_checksum": None,
                 "event_type": "added",
                 "seen_at": "2026-03-09T06:01:00+00:00",
                 "sitemap_link": "https://example.com/a",
@@ -85,7 +90,7 @@ def test_catalog_builder_rebuilds_latest_snapshot_from_history(s3, lambda_contex
     _write_parquet(
         s3,
         bucket,
-        "processed/discovery/dim_spot_location/year=2026/month=03/part-1.parquet",
+        "processed/discovery/dim_spot_location/year=2026/month=03/discovery_run_id=run-0.parquet",
         [
             {
                 "spot_version_id": "v1",
@@ -114,3 +119,4 @@ def test_catalog_builder_rebuilds_latest_snapshot_from_history(s3, lambda_contex
         )
     ).to_pylist()
     assert [row["spot_id"] for row in latest_core] == ["a"]
+

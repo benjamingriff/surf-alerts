@@ -34,12 +34,18 @@ def _parse_s3_reference(event: dict) -> tuple[str, str]:
     return bucket, key
 
 
-def _manifest_key(scrape_date: str, run_id: str) -> str:
-    return f"control/manifests/discovery_runs/date={scrape_date}/run_id={run_id}.json.gz"
+def _discovery_manifest_key(scrape_date: str, discovery_run_id: str) -> str:
+    return (
+        "control/manifests/discovery_runs/"
+        f"date={scrape_date}/discovery_run_id={discovery_run_id}/manifest.json.gz"
+    )
 
 
-def _processing_manifest_key(scrape_date: str, run_id: str) -> str:
-    return f"control/manifests/processing/domain=discovery/date={scrape_date}/run_id={run_id}.json.gz"
+def _processing_manifest_key(scrape_date: str, discovery_run_id: str, stage: str) -> str:
+    return (
+        "control/manifests/processing/"
+        f"domain=discovery/stage={stage}/date={scrape_date}/discovery_run_id={discovery_run_id}.json.gz"
+    )
 
 
 def _events_key(event_ts: datetime) -> str:
@@ -57,19 +63,10 @@ def _core_key(version_ts: datetime) -> str:
     )
 
 
-def _serialize_manifest(manifest: dict) -> dict:
-    serialized = dict(manifest)
-    for field in ("created_at", "catalog_ready_at"):
-        value = serialized.get(field)
-        if isinstance(value, datetime):
-            serialized[field] = value.isoformat()
-    return serialized
-
-
-def _build_added_event(spot_id: str, raw_key: str, run_id: str, event_ts: datetime) -> dict:
+def _build_added_event(spot_id: str, raw_key: str, discovery_run_id: str, event_ts: datetime) -> dict:
     return {
         "event_ts": event_ts,
-        "run_id": run_id,
+        "run_id": discovery_run_id,
         "spot_id": spot_id,
         "event_type": "added",
         "source_type": "sitemap",
@@ -85,7 +82,7 @@ def _build_removed_rows(
     *,
     latest_row: dict,
     raw_key: str,
-    run_id: str,
+    discovery_run_id: str,
     seen_at: datetime,
 ) -> tuple[dict, dict]:
     event_ts = _utc_now()
@@ -93,7 +90,7 @@ def _build_removed_rows(
     version_ts = event_ts
     event_row = {
         "event_ts": event_ts,
-        "run_id": run_id,
+        "run_id": discovery_run_id,
         "spot_id": latest_row["spot_id"],
         "event_type": "removed",
         "source_type": "sitemap",
@@ -112,7 +109,7 @@ def _build_removed_rows(
         "seen_at": seen_at,
         "sitemap_link": latest_row.get("sitemap_link"),
         "forecast_link": latest_row.get("forecast_link"),
-        "source_run_id": run_id,
+        "source_run_id": discovery_run_id,
         "source_raw_key": raw_key,
         "source_type": "sitemap",
         "schema_version": SCHEMA_VERSION,
@@ -131,23 +128,22 @@ def _build_manifest(
 ) -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
+        "manifest_type": "discovery_run",
         "discovery_run_id": raw_payload["run_id"],
         "sitemap_run_id": raw_payload["run_id"],
         "scrape_date": scrape_date,
         "source_type": "sitemap",
         "sitemap_raw_key": raw_key,
-        "expected_spot_ids": added_ids,
-        "expected_count": len(added_ids),
+        "added_spot_ids": added_ids,
+        "added_spot_count": len(added_ids),
         "removed_spot_ids": removed_ids,
         "removed_count": len(removed_ids),
-        "created_at": _utc_now(),
-        "catalog_ready_at": _utc_now() if not added_ids else None,
-        "processing_manifest_key": _processing_manifest_key(scrape_date, raw_payload["run_id"]),
+        "created_at": _utc_now().isoformat(),
     }
 
 
 def _queue_spot_scrapes(queue_url: str, manifest: dict, source_raw_key: str) -> None:
-    for spot_id in manifest["expected_spot_ids"]:
+    for spot_id in manifest["added_spot_ids"]:
         sqs_client.send_message(
             QueueUrl=queue_url,
             MessageBody=json.dumps(
@@ -169,8 +165,9 @@ def lambda_handler(event: dict, context: LambdaContext):
     if raw_payload is None:
         raise FileNotFoundError(f"Missing raw sitemap payload: s3://{bucket}/{key}")
 
+    discovery_run_id = raw_payload["run_id"]
     scrape_date = raw_payload["scraped_at"][:10]
-    manifest_key = _manifest_key(scrape_date=scrape_date, run_id=raw_payload["run_id"])
+    manifest_key = _discovery_manifest_key(scrape_date=scrape_date, discovery_run_id=discovery_run_id)
     if s3_client.object_exists(bucket, manifest_key):
         logger.info("Discovery run already processed", extra={"manifest_key": manifest_key})
         return {"statusCode": 200, "body": "duplicate sitemap event ignored"}
@@ -183,13 +180,13 @@ def lambda_handler(event: dict, context: LambdaContext):
     removed_ids = sorted(set(latest_by_spot_id) - set(sitemap_spots))
     seen_at = datetime.fromisoformat(raw_payload["scraped_at"])
 
-    event_rows = [_build_added_event(spot_id, key, raw_payload["run_id"], _utc_now()) for spot_id in added_ids]
+    event_rows = [_build_added_event(spot_id, key, discovery_run_id, _utc_now()) for spot_id in added_ids]
     tombstone_rows: list[dict] = []
     for spot_id in removed_ids:
         event_row, core_row = _build_removed_rows(
             latest_row=latest_by_spot_id[spot_id],
             raw_key=key,
-            run_id=raw_payload["run_id"],
+            discovery_run_id=discovery_run_id,
             seen_at=seen_at,
         )
         event_rows.append(event_row)
@@ -207,19 +204,21 @@ def lambda_handler(event: dict, context: LambdaContext):
         added_ids=added_ids,
         removed_ids=removed_ids,
     )
-    s3_client.put_json(bucket, manifest_key, _serialize_manifest(manifest))
+    s3_client.put_json(bucket, manifest_key, manifest)
 
-    queue_url = os.environ["SPOT_SCRAPER_QUEUE_URL"]
     if added_ids:
+        queue_url = os.environ["SPOT_SCRAPER_QUEUE_URL"]
         _queue_spot_scrapes(queue_url=queue_url, manifest=manifest, source_raw_key=key)
     else:
         s3_client.put_json(
             bucket,
-            manifest["processing_manifest_key"],
+            _processing_manifest_key(scrape_date, discovery_run_id, "catalog_build"),
             {
                 "schema_version": SCHEMA_VERSION,
+                "manifest_type": "processing_manifest",
                 "domain": "discovery",
-                "discovery_run_id": manifest["discovery_run_id"],
+                "stage": "catalog_build",
+                "discovery_run_id": discovery_run_id,
                 "scrape_date": scrape_date,
                 "source_manifest_key": manifest_key,
                 "source_keys": [key],

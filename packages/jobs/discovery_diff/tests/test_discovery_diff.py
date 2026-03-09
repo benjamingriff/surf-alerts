@@ -29,12 +29,7 @@ def _write_parquet(s3_client, bucket: str, key: str, rows: list[dict]) -> None:
 
 
 def _event(bucket: str, key: str) -> dict:
-    return {
-        "detail": {
-            "bucket": {"name": bucket},
-            "object": {"key": key},
-        }
-    }
+    return {"detail": {"bucket": {"name": bucket}, "object": {"key": key}}}
 
 
 def test_discovery_diff_enqueues_added_spots_and_writes_manifest(s3, monkeypatch, lambda_context):
@@ -67,7 +62,7 @@ def test_discovery_diff_enqueues_added_spots_and_writes_manifest(s3, monkeypatch
     assert response["statusCode"] == 200
     manifest = s3.get_object(
         Bucket=bucket,
-        Key="control/manifests/discovery_runs/date=2026-03-09/run_id=sitemap-1.json.gz",
+        Key="control/manifests/discovery_runs/date=2026-03-09/discovery_run_id=sitemap-1/manifest.json.gz",
     )
     assert manifest["ContentEncoding"] == "gzip"
 
@@ -76,7 +71,7 @@ def test_discovery_diff_enqueues_added_spots_and_writes_manifest(s3, monkeypatch
     assert queued_spot_ids == ["a", "b"]
 
 
-def test_discovery_diff_writes_tombstone_for_removed_spot(s3, monkeypatch, lambda_context):
+def test_discovery_diff_removed_only_emits_catalog_build_manifest(s3, monkeypatch, lambda_context):
     bucket = "dataeng-squeegee-test-bucket"
     sqs_client = boto3.client("sqs", region_name="eu-west-2")
     queue_url = sqs_client.create_queue(QueueName="spot-scraper-removed")["QueueUrl"]
@@ -123,10 +118,13 @@ def test_discovery_diff_writes_tombstone_for_removed_spot(s3, monkeypatch, lambd
 
     lambda_handler(_event(bucket, key), lambda_context)
 
-    listing = s3.list_objects_v2(Bucket=bucket, Prefix="processed/discovery/dim_spots_core/")
-    parquet_keys = [item["Key"] for item in listing["Contents"] if item["Key"].endswith(".parquet")]
-    assert len(parquet_keys) == 1
-    table = pq.read_table(io.BytesIO(s3.get_object(Bucket=bucket, Key=parquet_keys[0])["Body"].read()))
-    row = table.to_pylist()[0]
-    assert row["spot_id"] == "gone"
-    assert row["event_type"] == "removed"
+    manifest = s3.get_object(
+        Bucket=bucket,
+        Key=(
+            "control/manifests/processing/domain=discovery/stage=catalog_build/"
+            "date=2026-03-09/discovery_run_id=sitemap-2.json.gz"
+        ),
+    )
+    assert manifest["ContentEncoding"] == "gzip"
+
+

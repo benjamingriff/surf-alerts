@@ -5,15 +5,15 @@ requires-python = ">=3.12"
 [manifest]
 members = [
     "archive-legacy-data",
-    "catalog-builder",
     "cli",
+    "discovery-catalog-builder",
     "discovery-completion",
     "discovery-diff",
+    "discovery-spot-history-processor",
     "dispatcher",
     "forecast-scraper",
     "sitemap-scraper",
     "spot-reconciler",
-    "spot-report-processor",
     "spot-scraper",
     "surf-alerts",
     "taxonomy-scraper",
@@ -63,23 +63,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/be/ae/80c8689a846066156117ad76cdfca52003fb9d3f1f5de38535f4aba9bf6c/botocore-1.42.15.tar.gz", hash = "sha256:504c548aa333728c99a692908d3e6acb718983585ad7a836d2fab9604518a636", size = 14911429, upload-time = "2025-12-22T20:34:01.198Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8e/e9/0eb22fca88484f356f0af888b9655bd18db9173f8ab6b66600fd9e636473/botocore-1.42.15-py3-none-any.whl", hash = "sha256:888ec4a817cbc56a93d5945b458621d8a6f580694373f8e93f68984f27523913", size = 14584154, upload-time = "2025-12-22T20:33:58.491Z" },
-]
-
-[[package]]
-name = "catalog-builder"
-version = "0.1.0"
-source = { editable = "packages/jobs/catalog_builder" }
-dependencies = [
-    { name = "aws-lambda-powertools" },
-    { name = "boto3" },
-    { name = "pyarrow" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
-    { name = "boto3", specifier = ">=1.42.15" },
-    { name = "pyarrow", specifier = ">=23.0.0" },
 ]
 
 [[package]]
@@ -327,6 +310,23 @@ wheels = [
 ]
 
 [[package]]
+name = "discovery-catalog-builder"
+version = "0.1.0"
+source = { editable = "packages/jobs/discovery_catalog_builder" }
+dependencies = [
+    { name = "aws-lambda-powertools" },
+    { name = "boto3" },
+    { name = "pyarrow" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
+    { name = "boto3", specifier = ">=1.42.15" },
+    { name = "pyarrow", specifier = ">=21.0.0" },
+]
+
+[[package]]
 name = "discovery-completion"
 version = "0.1.0"
 source = { editable = "packages/jobs/discovery_completion" }
@@ -355,7 +355,24 @@ dependencies = [
 requires-dist = [
     { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
     { name = "boto3", specifier = ">=1.42.15" },
-    { name = "pyarrow", specifier = ">=23.0.0" },
+    { name = "pyarrow", specifier = ">=21.0.0" },
+]
+
+[[package]]
+name = "discovery-spot-history-processor"
+version = "0.1.0"
+source = { editable = "packages/jobs/discovery_spot_history_processor" }
+dependencies = [
+    { name = "aws-lambda-powertools" },
+    { name = "boto3" },
+    { name = "pyarrow" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
+    { name = "boto3", specifier = ">=1.42.15" },
+    { name = "pyarrow", specifier = ">=21.0.0" },
 ]
 
 [[package]]
@@ -961,23 +978,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "spot-report-processor"
-version = "0.1.0"
-source = { editable = "packages/jobs/spot_report_processor" }
-dependencies = [
-    { name = "aws-lambda-powertools" },
-    { name = "boto3" },
-    { name = "pyarrow" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
-    { name = "boto3", specifier = ">=1.42.15" },
-    { name = "pyarrow", specifier = ">=23.0.0" },
-]
-
-[[package]]
 name = "spot-scraper"
 version = "0.1.0"
 source = { editable = "packages/scrapers/spot_scraper" }
@@ -1001,17 +1001,17 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
-    { name = "catalog-builder" },
     { name = "cli" },
+    { name = "discovery-catalog-builder" },
     { name = "discovery-completion" },
     { name = "discovery-diff" },
+    { name = "discovery-spot-history-processor" },
     { name = "forecast-scraper" },
     { name = "moto" },
     { name = "pytest" },
     { name = "rich" },
     { name = "sitemap-scraper" },
     { name = "spot-reconciler" },
-    { name = "spot-report-processor" },
     { name = "spot-scraper" },
     { name = "taxonomy-scraper" },
 ]
@@ -1020,17 +1020,17 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "catalog-builder", editable = "packages/jobs/catalog_builder" },
     { name = "cli", editable = "packages/cli" },
+    { name = "discovery-catalog-builder", editable = "packages/jobs/discovery_catalog_builder" },
     { name = "discovery-completion", editable = "packages/jobs/discovery_completion" },
     { name = "discovery-diff", editable = "packages/jobs/discovery_diff" },
+    { name = "discovery-spot-history-processor", editable = "packages/jobs/discovery_spot_history_processor" },
     { name = "forecast-scraper", editable = "packages/scrapers/forecast_scraper" },
     { name = "moto", specifier = ">=5.1.19" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "rich", specifier = ">=14.2.0" },
     { name = "sitemap-scraper", editable = "packages/scrapers/sitemap_scraper" },
     { name = "spot-reconciler", editable = "packages/jobs/spot_reconciler" },
-    { name = "spot-report-processor", editable = "packages/jobs/spot_report_processor" },
     { name = "spot-scraper", editable = "packages/scrapers/spot_scraper" },
     { name = "taxonomy-scraper", editable = "packages/scrapers/taxonomy_scraper" },
 ]

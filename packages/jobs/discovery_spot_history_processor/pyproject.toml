@@ -1,13 +1,13 @@
 [project]
-name = "catalog-builder"
+name = "discovery-spot-history-processor"
 version = "0.1.0"
-description = "Rebuilds processed/discovery/catalog_latest from append-only discovery tables"
+description = "Builds discovery spot parquet history from a completed discovery run manifest"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aws-lambda-powertools>=3.23.0",
     "boto3>=1.42.15",
-    "pyarrow>=23.0.0",
+    "pyarrow>=21.0.0",
 ]
 
 [build-system]

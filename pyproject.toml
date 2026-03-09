@@ -9,11 +9,11 @@ dependencies = []
 [tool.uv.workspace]
 members = [
     "packages/cli",
-    "packages/jobs/catalog_builder",
+    "packages/jobs/discovery_catalog_builder",
     "packages/jobs/discovery_completion",
     "packages/jobs/discovery_diff",
     "packages/jobs/dispatcher",
-    "packages/jobs/spot_report_processor",
+    "packages/jobs/discovery_spot_history_processor",
     "packages/jobs/spot_reconciler",
     "packages/migrations/archive_legacy_data",
     "packages/scrapers/forecast_scraper",
@@ -24,25 +24,25 @@ members = [
 
 [tool.uv.sources]
 cli = { workspace = true }
-catalog-builder = { workspace = true }
+discovery-catalog-builder = { workspace = true }
 discovery-completion = { workspace = true }
 discovery-diff = { workspace = true }
 forecast-scraper = { workspace = true }
+discovery-spot-history-processor = { workspace = true }
 sitemap-scraper = { workspace = true }
-spot-report-processor = { workspace = true }
 taxonomy-scraper = { workspace = true }
 spot-reconciler = { workspace = true }
 spot-scraper = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "catalog-builder",
     "cli",
+    "discovery-catalog-builder",
     "discovery-completion",
     "discovery-diff",
     "forecast-scraper",
+    "discovery-spot-history-processor",
     "sitemap-scraper",
-    "spot-report-processor",
     "taxonomy-scraper",
     "spot-reconciler",
     "spot-scraper",
@@ -55,6 +55,7 @@ dev = [
 line-length = 100 
 
 [tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
 env = [
   "POWERTOOLS_LOG_LEVEL=INFO",
 ]

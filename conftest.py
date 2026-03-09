@@ -1,5 +1,7 @@
 import os
 import logging
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import boto3
@@ -8,6 +10,21 @@ from moto import mock_aws
 
 AWS_REGION = "eu-west-2"
 JOB_ID = "12345"
+REPO_ROOT = Path(__file__).resolve().parent
+SRC_PATHS = [
+    REPO_ROOT / "packages" / "jobs" / "discovery_catalog_builder" / "src",
+    REPO_ROOT / "packages" / "jobs" / "discovery_completion" / "src",
+    REPO_ROOT / "packages" / "jobs" / "discovery_diff" / "src",
+    REPO_ROOT / "packages" / "jobs" / "discovery_spot_history_processor" / "src",
+    REPO_ROOT / "packages" / "jobs" / "spot_reconciler" / "src",
+    REPO_ROOT / "packages" / "scrapers" / "forecast_scraper" / "src",
+    REPO_ROOT / "packages" / "scrapers" / "sitemap_scraper" / "src",
+    REPO_ROOT / "packages" / "scrapers" / "spot_scraper" / "src",
+    REPO_ROOT / "packages" / "scrapers" / "taxonomy_scraper" / "src",
+]
+
+for src_path in SRC_PATHS:
+    sys.path.insert(0, str(src_path))
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -47,7 +64,8 @@ def s3():
 def lambda_context():
     return SimpleNamespace(
         function_name="test-function",
-        memory_limit_in_mb=1024,
+        function_version="$LATEST",
         invoked_function_arn="arn:aws:lambda:eu-west-2:123456789012:function:test-function",
-        aws_request_id="request-id-123",
+        memory_limit_in_mb=256,
+        aws_request_id="test-request-id",
     )

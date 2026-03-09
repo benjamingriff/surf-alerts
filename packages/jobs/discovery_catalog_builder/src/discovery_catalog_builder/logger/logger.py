@@ -1,6 +1,6 @@
 from aws_lambda_powertools import Logger
 
-logger = Logger(service="catalog-builder")
+logger = Logger(service="discovery-catalog-builder")
 
 inject_lambda_context = logger.inject_lambda_context
 

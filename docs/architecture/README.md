@@ -107,5 +107,8 @@ members = [
 Planned additions to the workspace for the target discovery flow:
 
 - `packages/jobs/discovery_diff`
-- `packages/jobs/spot_report_processor`
-- `packages/jobs/catalog_builder`
+- `packages/jobs/discovery_spot_history_processor`
+- `packages/jobs/discovery_catalog_builder`
+- `packages/jobs/forecast_batch_planner`
+- `packages/jobs/forecast_batch_completion`
+- `packages/jobs/forecast_processor`

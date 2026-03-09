@@ -1,6 +1,6 @@
 from aws_lambda_powertools import Logger
 
-logger = Logger(service="spot-report-processor")
+logger = Logger(service="discovery-diff")
 
 inject_lambda_context = logger.inject_lambda_context
 

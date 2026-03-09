@@ -15,7 +15,6 @@ export class InfrastructureStack extends cdk.Stack {
     const projectName = "surf-alerts";
     const codebuildSrcDir = process.env.CODEBUILD_SRC_DIR ?? ".";
 
-    // S3 bucket for storing scraped data
     const dataBucket = new s3.Bucket(this, "DataBucket", {
       bucketName: `${projectName}-data`,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
@@ -23,30 +22,24 @@ export class InfrastructureStack extends cdk.Stack {
       eventBridgeEnabled: true,
     });
 
-    // Sitemap scraper - runs daily at 06:00 UTC
-    const sitemapScraper = new ScheduledScraper(
-      this,
-      "SitemapScraperConstruct",
-      {
-        projectName: projectName,
-        scraperName: "sitemap-scraper",
-        codePath: path.join(
-          codebuildSrcDir,
-          "..",
-          "packages",
-          "scrapers",
-          "sitemap_scraper",
-        ),
-        timeout: 60,
-        memorySize: 1024,
-        schedule: events.Schedule.cron({ hour: "6", minute: "0" }),
-        bucket: dataBucket,
-      },
-    );
+    const sitemapScraper = new ScheduledScraper(this, "SitemapScraperConstruct", {
+      projectName,
+      scraperName: "sitemap-scraper",
+      codePath: path.join(
+        codebuildSrcDir,
+        "..",
+        "packages",
+        "scrapers",
+        "sitemap_scraper",
+      ),
+      timeout: 60,
+      memorySize: 1024,
+      schedule: events.Schedule.cron({ hour: "6", minute: "0" }),
+      bucket: dataBucket,
+    });
 
-    // Spot scraper - SQS triggered, processes individual spots from taxonomy API
     const spotScraper = new ScraperWorker(this, "SpotScraperConstruct", {
-      projectName: projectName,
+      projectName,
       scraperName: "spot-scraper",
       codePath: path.join(
         codebuildSrcDir,
@@ -63,10 +56,8 @@ export class InfrastructureStack extends cdk.Stack {
       },
     });
 
-    dataBucket.grantReadWrite(spotScraper.lambdaFunction);
-
     const discoveryDiff = new DockerFunction(this, "DiscoveryDiffConstruct", {
-      projectName: projectName,
+      projectName,
       functionName: "discovery-diff",
       codePath: path.join(
         codebuildSrcDir,
@@ -83,32 +74,11 @@ export class InfrastructureStack extends cdk.Stack {
       },
     });
 
-    const spotReportProcessor = new DockerFunction(
-      this,
-      "SpotReportProcessorConstruct",
-      {
-        projectName: projectName,
-        functionName: "spot-report-processor",
-        codePath: path.join(
-          codebuildSrcDir,
-          "..",
-          "packages",
-          "jobs",
-          "spot_report_processor",
-        ),
-        timeout: 120,
-        memorySize: 1024,
-        environment: {
-          DATA_BUCKET: dataBucket.bucketName,
-        },
-      },
-    );
-
     const discoveryCompletion = new DockerFunction(
       this,
       "DiscoveryCompletionConstruct",
       {
-        projectName: projectName,
+        projectName,
         functionName: "discovery-completion",
         codePath: path.join(
           codebuildSrcDir,
@@ -125,27 +95,54 @@ export class InfrastructureStack extends cdk.Stack {
       },
     );
 
-    const catalogBuilder = new DockerFunction(this, "CatalogBuilderConstruct", {
-      projectName: projectName,
-      functionName: "catalog-builder",
-      codePath: path.join(
-        codebuildSrcDir,
-        "..",
-        "packages",
-        "jobs",
-        "catalog_builder",
-      ),
-      timeout: 180,
-      memorySize: 1024,
-      environment: {
-        DATA_BUCKET: dataBucket.bucketName,
+    const discoverySpotHistoryProcessor = new DockerFunction(
+      this,
+      "DiscoverySpotHistoryProcessorConstruct",
+      {
+        projectName,
+        functionName: "discovery-spot-history-processor",
+        codePath: path.join(
+          codebuildSrcDir,
+          "..",
+          "packages",
+          "jobs",
+          "discovery_spot_history_processor",
+        ),
+        timeout: 180,
+        memorySize: 1024,
+        environment: {
+          DATA_BUCKET: dataBucket.bucketName,
+        },
       },
-    });
+    );
 
+    const discoveryCatalogBuilder = new DockerFunction(
+      this,
+      "DiscoveryCatalogBuilderConstruct",
+      {
+        projectName,
+        functionName: "discovery-catalog-builder",
+        codePath: path.join(
+          codebuildSrcDir,
+          "..",
+          "packages",
+          "jobs",
+          "discovery_catalog_builder",
+        ),
+        timeout: 180,
+        memorySize: 1024,
+        environment: {
+          DATA_BUCKET: dataBucket.bucketName,
+        },
+      },
+    );
+
+    dataBucket.grantReadWrite(sitemapScraper.lambdaFunction);
+    dataBucket.grantReadWrite(spotScraper.lambdaFunction);
     dataBucket.grantReadWrite(discoveryDiff.lambdaFunction);
-    dataBucket.grantReadWrite(spotReportProcessor.lambdaFunction);
     dataBucket.grantReadWrite(discoveryCompletion.lambdaFunction);
-    dataBucket.grantReadWrite(catalogBuilder.lambdaFunction);
+    dataBucket.grantReadWrite(discoverySpotHistoryProcessor.lambdaFunction);
+    dataBucket.grantReadWrite(discoveryCatalogBuilder.lambdaFunction);
     spotScraper.queue.grantSendMessages(discoveryDiff.lambdaFunction);
 
     new events.Rule(this, "DiscoveryDiffRule", {
@@ -160,44 +157,44 @@ export class InfrastructureStack extends cdk.Stack {
       targets: [new targets.LambdaFunction(discoveryDiff.lambdaFunction)],
     });
 
-    new events.Rule(this, "SpotReportProcessorRule", {
-      eventPattern: {
-        source: ["aws.s3"],
-        detailType: ["Object Created"],
-        detail: {
-          bucket: { name: [dataBucket.bucketName] },
-          object: { key: [{ prefix: "raw/spot_report/" }] },
-        },
-      },
-      targets: [new targets.LambdaFunction(spotReportProcessor.lambdaFunction)],
-    });
-
     new events.Rule(this, "DiscoveryCompletionRule", {
       eventPattern: {
         source: ["aws.s3"],
         detailType: ["Object Created"],
         detail: {
           bucket: { name: [dataBucket.bucketName] },
-          object: { key: [{ prefix: "control/manifests/discovery_runs/" }] },
+          object: { key: [{ prefix: "control/completions/discovery_spot_scrapes/" }] },
         },
       },
       targets: [new targets.LambdaFunction(discoveryCompletion.lambdaFunction)],
     });
 
-    new events.Rule(this, "CatalogBuilderRule", {
+    new events.Rule(this, "DiscoverySpotHistoryProcessorRule", {
       eventPattern: {
         source: ["aws.s3"],
         detailType: ["Object Created"],
         detail: {
           bucket: { name: [dataBucket.bucketName] },
           object: {
-            key: [{ prefix: "control/manifests/processing/domain=discovery/" }],
+            key: [{ prefix: "control/manifests/processing/domain=discovery/stage=spot_history/" }],
           },
         },
       },
-      targets: [new targets.LambdaFunction(catalogBuilder.lambdaFunction)],
+      targets: [new targets.LambdaFunction(discoverySpotHistoryProcessor.lambdaFunction)],
     });
 
-    dataBucket.grantReadWrite(sitemapScraper.lambdaFunction);
+    new events.Rule(this, "DiscoveryCatalogBuilderRule", {
+      eventPattern: {
+        source: ["aws.s3"],
+        detailType: ["Object Created"],
+        detail: {
+          bucket: { name: [dataBucket.bucketName] },
+          object: {
+            key: [{ prefix: "control/manifests/processing/domain=discovery/stage=catalog_build/" }],
+          },
+        },
+      },
+      targets: [new targets.LambdaFunction(discoveryCatalogBuilder.lambdaFunction)],
+    });
   }
 }

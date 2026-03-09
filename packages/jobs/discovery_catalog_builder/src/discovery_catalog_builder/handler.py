@@ -4,8 +4,8 @@ from urllib.parse import unquote_plus
 import pyarrow as pa
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
-from catalog_builder.logger import get_logger, inject_lambda_context
-from catalog_builder.s3 import S3Client
+from discovery_catalog_builder.logger import get_logger, inject_lambda_context
+from discovery_catalog_builder.s3 import S3Client
 
 logger = get_logger()
 s3_client = S3Client()
@@ -114,7 +114,7 @@ def _parse_s3_reference(event: dict) -> tuple[str, str]:
 
 
 def _checkpoint_key(discovery_run_id: str) -> str:
-    return f"control/checkpoints/catalog_builder/run_id={discovery_run_id}.json.gz"
+    return f"control/checkpoints/discovery_catalog_builder/discovery_run_id={discovery_run_id}.json.gz"
 
 
 def _parse_timestamp(value):
@@ -142,6 +142,8 @@ def lambda_handler(event: dict, context: LambdaContext):
     manifest = s3_client.get_json(bucket, key)
     if manifest is None:
         raise FileNotFoundError(f"Missing processing manifest: s3://{bucket}/{key}")
+    if manifest.get("stage") != "catalog_build":
+        raise ValueError(f"Unexpected processing stage: {manifest.get('stage')}")
 
     checkpoint_key = _checkpoint_key(manifest["discovery_run_id"])
     if s3_client.object_exists(bucket, checkpoint_key):
