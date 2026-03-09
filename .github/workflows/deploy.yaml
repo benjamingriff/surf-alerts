@@ -3,6 +3,10 @@ name: Deploy AWS
 on:
   push:
     branches: ["main"]
+    paths:
+      - "packages/**"
+      - "infrastructure/**"
+      - ".github/workflows/**"
 
 permissions:
   id-token: write
