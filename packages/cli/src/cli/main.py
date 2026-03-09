@@ -8,6 +8,7 @@ from rich import print as rprint
 from cli.scrapers.forecast import run_forecast_scraper
 from cli.scrapers.sitemap import run_sitemap_scraper
 from cli.scrapers.taxonomy import run_taxonomy_scraper
+from cli.scrapers.spot import run_spot_scraper
 
 app = typer.Typer(
     help="CLI tool to run scrapers locally and save sample data",
@@ -131,6 +132,41 @@ def taxonomy():
         json.dump(metadata, f, indent=2)
 
     rprint(f"[green]Data saved to:[/green] {output_dir}")
+    rprint(f"  - {metadata_file.name}")
+
+
+@app.command()
+def spot(
+    spot_id: str = typer.Option(DEFAULT_SPOT_ID, "--spot-id", "-s", help="Surfline spot ID"),
+):
+    """Scrape spot data for a surf spot and save to data/spot/"""
+    rprint(f"[blue]Scraping spot report for spot:[/blue] {spot_id}")
+
+    try:
+        data = run_spot_scraper(spot_id)
+    except Exception as e:
+        rprint(f"[red]Error scraping spot:[/red] {e}")
+        raise typer.Exit(code=1)
+
+    output_dir = get_timestamped_dir("spot")
+
+    # Write data.json
+    data_file = output_dir / "data.json"
+    with open(data_file, "w") as f:
+        json.dump(data, f, indent=2)
+
+    # Write metadata.json
+    metadata = {
+        "spot_id": spot_id,
+        "timestamp": datetime.now().isoformat(),
+        "scraper": "spot",
+    }
+    metadata_file = output_dir / "metadata.json"
+    with open(metadata_file, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    rprint(f"[green]Data saved to:[/green] {output_dir}")
+    rprint(f"  - {data_file.name}")
     rprint(f"  - {metadata_file.name}")
 
 
