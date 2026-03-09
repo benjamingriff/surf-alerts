@@ -262,6 +262,15 @@ def lambda_handler(event: dict, context: LambdaContext):
     if existing_spot_ids:
         raise ValueError(f"Discovery run contains already-active spot IDs: {existing_spot_ids}")
 
+    logger.info(
+        "Building discovery spot history",
+        extra={
+            "discovery_run_id": manifest["discovery_run_id"],
+            "successful_spot_count": len(manifest.get("spot_ids", [])),
+            "failed_spot_count": manifest.get("failed_spot_count", 0),
+        },
+    )
+
     table_rows = {
         "dim_spots_core": [],
         "dim_spot_location": [],
@@ -313,6 +322,8 @@ def lambda_handler(event: dict, context: LambdaContext):
             "scrape_date": manifest["scrape_date"],
             "source_manifest_key": key,
             "source_keys": written_keys,
+            "failed_spot_ids": manifest.get("failed_spot_ids", []),
+            "failed_spot_count": manifest.get("failed_spot_count", 0),
             "ready_at": _utc_now().isoformat(),
         },
     )

@@ -51,3 +51,4 @@ def test_spot_scraper_writes_raw_report_and_completion_marker(s3, monkeypatch, l
     )
     assert completion_payload["discovery_run_id"] == "run-1"
     assert completion_payload["spot_id"] == "abc"
+    assert completion_payload["terminal_status"] == "success"

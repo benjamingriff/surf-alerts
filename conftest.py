@@ -15,6 +15,7 @@ SRC_PATHS = [
     REPO_ROOT / "packages" / "jobs" / "discovery_catalog_builder" / "src",
     REPO_ROOT / "packages" / "jobs" / "discovery_completion" / "src",
     REPO_ROOT / "packages" / "jobs" / "discovery_diff" / "src",
+    REPO_ROOT / "packages" / "jobs" / "discovery_failure_finalizer" / "src",
     REPO_ROOT / "packages" / "jobs" / "discovery_spot_history_processor" / "src",
     REPO_ROOT / "packages" / "jobs" / "spot_reconciler" / "src",
     REPO_ROOT / "packages" / "scrapers" / "forecast_scraper" / "src",

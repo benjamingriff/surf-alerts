@@ -88,6 +88,8 @@ def test_spot_history_processor_writes_bulk_history_and_catalog_manifest(s3, lam
             "source_manifest_key": "control/manifests/discovery_runs/date=2026-03-09/discovery_run_id=run-1/manifest.json.gz",
             "spot_ids": ["abc"],
             "raw_keys": [raw_key],
+            "failed_spot_ids": [],
+            "failed_spot_count": 0,
             "ready_at": "2026-03-09T06:10:00+00:00",
         },
     )
@@ -114,3 +116,48 @@ def test_spot_history_processor_writes_bulk_history_and_catalog_manifest(s3, lam
     )
     assert catalog_manifest["ContentEncoding"] == "gzip"
 
+
+def test_spot_history_processor_allows_zero_successful_spots(s3, lambda_context):
+    bucket = "dataeng-squeegee-test-bucket"
+    manifest_key = (
+        "control/manifests/processing/domain=discovery/stage=spot_history/"
+        "date=2026-03-09/discovery_run_id=run-2.json.gz"
+    )
+
+    _write_gzip_json(
+        s3,
+        bucket,
+        manifest_key,
+        {
+            "schema_version": 1,
+            "manifest_type": "processing_manifest",
+            "domain": "discovery",
+            "stage": "spot_history",
+            "discovery_run_id": "run-2",
+            "scrape_date": "2026-03-09",
+            "source_manifest_key": "control/manifests/discovery_runs/date=2026-03-09/discovery_run_id=run-2/manifest.json.gz",
+            "spot_ids": [],
+            "raw_keys": [],
+            "failed_spot_ids": ["abc"],
+            "failed_spot_count": 1,
+            "ready_at": "2026-03-09T06:10:00+00:00",
+        },
+    )
+
+    response = lambda_handler(_event(bucket, manifest_key), lambda_context)
+
+    assert response["statusCode"] == 200
+    catalog_manifest = json.loads(
+        gzip.decompress(
+            s3.get_object(
+                Bucket=bucket,
+                Key=(
+                    "control/manifests/processing/domain=discovery/stage=catalog_build/"
+                    "date=2026-03-09/discovery_run_id=run-2.json.gz"
+                ),
+            )["Body"].read()
+        ).decode("utf-8")
+    )
+    assert catalog_manifest["source_keys"] == []
+    assert catalog_manifest["failed_spot_ids"] == ["abc"]
+    assert catalog_manifest["failed_spot_count"] == 1

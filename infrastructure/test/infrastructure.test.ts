@@ -10,12 +10,13 @@ test("discovery infrastructure resources are synthesized", () => {
   template.resourceCountIs("AWS::Events::Rule", 5);
 
   [
-    "SufAlertsStack-sitemap-scraper",
-    "SufAlertsStack-spot-scraper",
-    "SufAlertsStack-discovery-diff",
-    "SufAlertsStack-spot-report-processor",
-    "SufAlertsStack-discovery-completion",
-    "SufAlertsStack-catalog-builder",
+    "surf-alerts-sitemap-scraper",
+    "surf-alerts-spot-scraper",
+    "surf-alerts-discovery-diff",
+    "surf-alerts-discovery-completion",
+    "surf-alerts-discovery-failure-finalizer",
+    "surf-alerts-discovery-spot-history-processor",
+    "surf-alerts-discovery-catalog-builder",
   ].forEach((functionName) => {
     template.hasResourceProperties("AWS::Lambda::Function", {
       FunctionName: functionName,
@@ -23,7 +24,7 @@ test("discovery infrastructure resources are synthesized", () => {
   });
 
   template.hasResourceProperties("AWS::SQS::Queue", {
-    QueueName: "SufAlertsStack-spot-scraper-queue",
+    QueueName: "surf-alerts-spot-scraper-queue",
   });
 
   template.hasResourceProperties("AWS::Events::Rule", {
@@ -35,6 +36,16 @@ test("discovery infrastructure resources are synthesized", () => {
           key: Match.arrayWith([Match.objectLike({ prefix: "raw/sitemap/" })]),
         },
       },
+    },
+  });
+
+  template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+    BatchSize: 1,
+    EventSourceArn: {
+      "Fn::GetAtt": [Match.stringLikeRegexp("SpotScraperConstructScraperQueueQueueDLQ"), "Arn"],
+    },
+    FunctionName: {
+      Ref: Match.stringLikeRegexp("DiscoveryFailureFinalizerConstructLambdaFn"),
     },
   });
 });

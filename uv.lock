@@ -9,6 +9,7 @@ members = [
     "discovery-catalog-builder",
     "discovery-completion",
     "discovery-diff",
+    "discovery-failure-finalizer",
     "discovery-spot-history-processor",
     "dispatcher",
     "forecast-scraper",
@@ -356,6 +357,21 @@ requires-dist = [
     { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
     { name = "boto3", specifier = ">=1.42.15" },
     { name = "pyarrow", specifier = ">=21.0.0" },
+]
+
+[[package]]
+name = "discovery-failure-finalizer"
+version = "0.1.0"
+source = { editable = "packages/jobs/discovery_failure_finalizer" }
+dependencies = [
+    { name = "aws-lambda-powertools" },
+    { name = "boto3" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
+    { name = "boto3", specifier = ">=1.42.15" },
 ]
 
 [[package]]
@@ -1005,6 +1021,7 @@ dev = [
     { name = "discovery-catalog-builder" },
     { name = "discovery-completion" },
     { name = "discovery-diff" },
+    { name = "discovery-failure-finalizer" },
     { name = "discovery-spot-history-processor" },
     { name = "forecast-scraper" },
     { name = "moto" },
@@ -1024,6 +1041,7 @@ dev = [
     { name = "discovery-catalog-builder", editable = "packages/jobs/discovery_catalog_builder" },
     { name = "discovery-completion", editable = "packages/jobs/discovery_completion" },
     { name = "discovery-diff", editable = "packages/jobs/discovery_diff" },
+    { name = "discovery-failure-finalizer", editable = "packages/jobs/discovery_failure_finalizer" },
     { name = "discovery-spot-history-processor", editable = "packages/jobs/discovery_spot_history_processor" },
     { name = "forecast-scraper", editable = "packages/scrapers/forecast_scraper" },
     { name = "moto", specifier = ">=5.1.19" },

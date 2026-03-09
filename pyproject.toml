@@ -12,6 +12,7 @@ members = [
     "packages/jobs/discovery_catalog_builder",
     "packages/jobs/discovery_completion",
     "packages/jobs/discovery_diff",
+    "packages/jobs/discovery_failure_finalizer",
     "packages/jobs/dispatcher",
     "packages/jobs/discovery_spot_history_processor",
     "packages/jobs/spot_reconciler",
@@ -27,6 +28,7 @@ cli = { workspace = true }
 discovery-catalog-builder = { workspace = true }
 discovery-completion = { workspace = true }
 discovery-diff = { workspace = true }
+discovery-failure-finalizer = { workspace = true }
 forecast-scraper = { workspace = true }
 discovery-spot-history-processor = { workspace = true }
 sitemap-scraper = { workspace = true }
@@ -40,6 +42,7 @@ dev = [
     "discovery-catalog-builder",
     "discovery-completion",
     "discovery-diff",
+    "discovery-failure-finalizer",
     "forecast-scraper",
     "discovery-spot-history-processor",
     "sitemap-scraper",

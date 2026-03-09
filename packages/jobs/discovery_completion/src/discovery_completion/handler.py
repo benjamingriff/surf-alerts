@@ -12,9 +12,11 @@ s3_client = S3Client()
 SCHEMA_VERSION = 1
 
 COMPLETION_KEY_PATTERN = re.compile(
-    r"control/completions/discovery_spot_scrapes/date=(?P<scrape_date>\d{4}-\d{2}-\d{2})/"
+    r"control/completions/discovery_spot_scrapes(?:_failed)?/date=(?P<scrape_date>\d{4}-\d{2}-\d{2})/"
     r"discovery_run_id=(?P<discovery_run_id>[^/]+)/spot_id=(?P<spot_id>[^/]+)\.json\.gz$"
 )
+SUCCESS_COMPLETION_PREFIX = "control/completions/discovery_spot_scrapes"
+FAILED_COMPLETION_PREFIX = "control/completions/discovery_spot_scrapes_failed"
 
 
 def _utc_now() -> datetime:
@@ -43,11 +45,35 @@ def _discovery_manifest_key(scrape_date: str, discovery_run_id: str) -> str:
     )
 
 
-def _completion_prefix(scrape_date: str, discovery_run_id: str) -> str:
-    return (
-        "control/completions/discovery_spot_scrapes/"
-        f"date={scrape_date}/discovery_run_id={discovery_run_id}/"
-    )
+def _completion_prefix(prefix_root: str, scrape_date: str, discovery_run_id: str) -> str:
+    return f"{prefix_root}/date={scrape_date}/discovery_run_id={discovery_run_id}/"
+
+
+def _load_terminal_markers(bucket: str, scrape_date: str, discovery_run_id: str) -> tuple[dict, dict]:
+    success_keys = [
+        key
+        for key in s3_client.list_keys(bucket, _completion_prefix(SUCCESS_COMPLETION_PREFIX, scrape_date, discovery_run_id))
+        if key.endswith(".json.gz")
+    ]
+    failed_keys = [
+        key
+        for key in s3_client.list_keys(bucket, _completion_prefix(FAILED_COMPLETION_PREFIX, scrape_date, discovery_run_id))
+        if key.endswith(".json.gz")
+    ]
+
+    success_payloads = [s3_client.get_json(bucket, key) for key in success_keys]
+    failed_payloads = [s3_client.get_json(bucket, key) for key in failed_keys]
+    successes_by_spot_id = {
+        payload["spot_id"]: payload
+        for payload in success_payloads
+        if payload and payload.get("spot_id")
+    }
+    failures_by_spot_id = {
+        payload["spot_id"]: payload
+        for payload in failed_payloads
+        if payload and payload.get("spot_id") and payload["spot_id"] not in successes_by_spot_id
+    }
+    return successes_by_spot_id, failures_by_spot_id
 
 
 def _processing_manifest_key(scrape_date: str, discovery_run_id: str) -> str:
@@ -71,28 +97,34 @@ def lambda_handler(event: dict, context: LambdaContext):
         logger.info("Processing manifest already exists", extra={"processing_manifest_key": processing_manifest_key})
         return {"statusCode": 200, "body": "duplicate completion event ignored"}
 
-    completion_keys = [
-        completion_key
-        for completion_key in s3_client.list_keys(bucket, _completion_prefix(scrape_date, discovery_run_id))
-        if completion_key.endswith(".json.gz")
-    ]
-    completion_payloads = [s3_client.get_json(bucket, completion_key) for completion_key in completion_keys]
-    completions_by_spot_id = {
-        payload["spot_id"]: payload
-        for payload in completion_payloads
-        if payload and payload.get("spot_id")
-    }
+    successes_by_spot_id, failures_by_spot_id = _load_terminal_markers(bucket, scrape_date, discovery_run_id)
+    terminal_count = len(successes_by_spot_id) + len(failures_by_spot_id)
 
     expected_count = manifest["added_spot_count"]
-    if len(completions_by_spot_id) < expected_count:
+    if terminal_count < expected_count:
         logger.info(
             "Discovery run not complete yet",
-            extra={"completed_count": len(completions_by_spot_id), "expected_count": expected_count},
+            extra={
+                "successful_count": len(successes_by_spot_id),
+                "failed_count": len(failures_by_spot_id),
+                "terminal_count": terminal_count,
+                "expected_count": expected_count,
+            },
         )
         return {"statusCode": 200, "body": "waiting for remaining spot scrapes"}
 
-    ordered_spot_ids = [spot_id for spot_id in manifest["added_spot_ids"] if spot_id in completions_by_spot_id]
-    raw_keys = [completions_by_spot_id[spot_id]["raw_key"] for spot_id in ordered_spot_ids]
+    ordered_spot_ids = [spot_id for spot_id in manifest["added_spot_ids"] if spot_id in successes_by_spot_id]
+    raw_keys = [successes_by_spot_id[spot_id]["raw_key"] for spot_id in ordered_spot_ids]
+    failed_spot_ids = [spot_id for spot_id in manifest["added_spot_ids"] if spot_id in failures_by_spot_id]
+    failed_spots = [
+        {
+            "spot_id": spot_id,
+            "failure_reason": failures_by_spot_id[spot_id].get("failure_reason"),
+            "failure_source": failures_by_spot_id[spot_id].get("failure_source"),
+            "completed_at": failures_by_spot_id[spot_id].get("completed_at"),
+        }
+        for spot_id in failed_spot_ids
+    ]
     s3_client.put_json(
         bucket,
         processing_manifest_key,
@@ -106,6 +138,9 @@ def lambda_handler(event: dict, context: LambdaContext):
             "source_manifest_key": manifest_key,
             "spot_ids": ordered_spot_ids,
             "raw_keys": raw_keys,
+            "failed_spot_ids": failed_spot_ids,
+            "failed_spot_count": len(failed_spot_ids),
+            "failed_spots": failed_spots,
             "ready_at": _utc_now().isoformat(),
         },
     )

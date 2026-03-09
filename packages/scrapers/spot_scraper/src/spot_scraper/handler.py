@@ -82,6 +82,7 @@ def lambda_handler(event: dict, context: LambdaContext):
                 body={
                     "schema_version": SCHEMA_VERSION,
                     "source_type": "spot_scrape_completion",
+                    "terminal_status": "success",
                     "discovery_run_id": discovery_run_id,
                     "spot_id": spot_id,
                     "raw_run_id": run_id,
