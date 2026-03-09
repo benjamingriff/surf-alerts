@@ -20,6 +20,8 @@
 
 * [Data Layer Overview](data_architecture/README.md)
 * [Storage Layout](data_architecture/storage-layout.md)
+* [Discovery Schema](data_architecture/discovery-schema.md)
+* [Discovery Transformations](data_architecture/discovery-transformations.md)
 * [Forecast Schema](data_architecture/forecast-schema.md)
 * [Forecast Transformations](data_architecture/forecast-transformations.md)
 * [Forecast Queries](data_architecture/forecast-queries.md)
@@ -48,6 +50,7 @@
 * [Package Index](packages/README.md)
 * [CLI](packages/cli.md)
 * [Dispatcher](packages/dispatcher.md)
+* [Discovery Processors](packages/discovery-processors.md)
 * [Spot Reconciler](packages/spot-reconciler.md)
 * [Frontend](packages/frontend.md)
 * [API Package](packages/api-package.md)

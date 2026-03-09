@@ -1,12 +1,12 @@
 # Taxonomy Scraper
 
-> **Status: IMPLEMENTED** | Currently disabled in infrastructure
+> **Status: IMPLEMENTED** | Currently disabled in infrastructure | Legacy discovery path
 
 Recursively walks the Surfline geographic hierarchy (Earth > Continents > Countries > Regions > Subregions > Spots). EventBridge-triggered scheduled Lambda with 10-minute timeout.
 
 **Package:** `packages/scrapers/taxonomy_scraper/`
 
-> **Storage note:** The raw-layer path below describes the target storage contract after the layered storage rework.
+> **Architecture note:** This scraper is not part of the active target discovery flow. The target flow uses sitemap for spot-universe detection and spot reports for rich metadata.
 
 ## Endpoint Scraped
 
@@ -89,21 +89,15 @@ Spot-level nodes include `spot_id` and `link` fields instead of `contains`.
 | Timeout | 600s (10 minutes) |
 | Status | Disabled |
 
-## Spot Reconciler
+## Current Role
 
-The **spot reconciler** (`packages/jobs/spot_reconciler/`) runs after the sitemap and taxonomy scrapers (06:15 UTC) and:
+This scraper remains documented because the package exists and may still be useful for research, backfills, or geographic enrichment. It is not the planned source of truth for live discovery.
 
-1. Reads raw sitemap data (`raw/sitemap/...`)
-2. Reads raw taxonomy data (`raw/taxonomy/...`)
-3. Reads previous latest state (`processed/discovery/latest/state.json.gz`)
-4. Flattens taxonomy tree, merges with sitemap URLs
-5. Computes SHA256 checksums on mutable fields (name, lat, lng, timezone, utc_offset, link)
-6. Detects changes: added, removed, modified spots
+The target discovery architecture instead uses:
 
-**Outputs:**
-- `processed/discovery/snapshots/...` — full current catalog snapshot
-- `processed/discovery/changes/...` — change records
-- `processed/discovery/latest/state.json.gz` — state snapshot for next run
-- `processed/discovery/latest/catalog.json.gz` — latest catalog for readers
+- sitemap-driven `added` / `removed` detection
+- spot-report-driven checksum changes
+- append-only Parquet version tables in `processed/discovery/`
+- a derived `catalog_latest/` snapshot for operational reads
 
 See [Surfline Taxonomy & Search](../surfline/taxonomy-and-search.md) for the taxonomy API details and [Storage Layout](../data_architecture/storage-layout.md) for the target bucket structure.

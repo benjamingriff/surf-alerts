@@ -20,7 +20,7 @@ This is a **partial medallion** design:
 
 1. **One bucket, clear layers** - keep lifecycle and permissions simple with top-level prefixes.
 2. **Immutable raw data** - every raw object is append-only and keyed by `run_id`.
-3. **Mutable latest views only in processed** - only `processed/.../latest/` may be overwritten.
+3. **Mutable serving snapshots only in processed** - only derived serving artifacts may be overwritten.
 4. **Lineage everywhere** - processed objects must record the raw key or keys they came from.
 5. **Event boundary at raw ingest** - downstream jobs react to raw object creation rather than scraper-specific schedules.
 
@@ -50,9 +50,6 @@ raw/
   sitemap/
     scrape_date=YYYY-MM-DD/
       run_id=<run_id>.json.gz
-  taxonomy/
-    scrape_date=YYYY-MM-DD/
-      run_id=<run_id>.json.gz
 ```
 
 Retention defaults:
@@ -60,7 +57,8 @@ Retention defaults:
 - `raw/forecast/`: 14 days
 - `raw/spot_report/`: 30 days
 - `raw/sitemap/`: 30 days
-- `raw/taxonomy/`: 30 days
+
+`raw/taxonomy/` is not part of the active target discovery flow. If retained for experiments or legacy backfills, it should follow the same short-retention pattern.
 
 ### `processed/`
 
@@ -69,18 +67,47 @@ Durable canonical data for operational reads plus longer-lived analytical tables
 ```text
 processed/
   discovery/
-    snapshots/
-      snapshot_date=YYYY-MM-DD/
-        catalog.json.gz
-    changes/
-      change_date=YYYY-MM-DD/
-        run_id=<run_id>.json.gz
-    spots/
-      spot_id=<spot_id>/
-        latest.json.gz
-    latest/
-      catalog.json.gz
-      state.json.gz
+    events/
+      year=YYYY/
+        month=MM/
+          event_date=YYYY-MM-DD/
+            part-*.parquet
+    dim_spots_core/
+      year=YYYY/
+        month=MM/
+          part-*.parquet
+    dim_spot_location/
+      year=YYYY/
+        month=MM/
+          part-*.parquet
+    dim_spot_breadcrumbs/
+      year=YYYY/
+        month=MM/
+          part-*.parquet
+    dim_spot_cameras/
+      year=YYYY/
+        month=MM/
+          part-*.parquet
+    dim_spot_ability_levels/
+      year=YYYY/
+        month=MM/
+          part-*.parquet
+    dim_spot_board_types/
+      year=YYYY/
+        month=MM/
+          part-*.parquet
+    dim_spot_travel_details/
+      year=YYYY/
+        month=MM/
+          part-*.parquet
+    catalog_latest/
+      dim_spots_core.parquet
+      dim_spot_location.parquet
+      dim_spot_breadcrumbs.parquet
+      dim_spot_cameras.parquet
+      dim_spot_ability_levels.parquet
+      dim_spot_board_types.parquet
+      dim_spot_travel_details.parquet
 
   forecast/
     canonical/
@@ -134,13 +161,13 @@ control/
 
 ### Spot Discovery
 
-- Sitemap and taxonomy scrapers write to `raw/sitemap/...` and `raw/taxonomy/...`
-- Reconciliation produces:
-  - point-in-time catalog snapshots
-  - append-only change files
-  - a mutable latest catalog/state view
+- Sitemap scrapes write raw snapshots to `raw/sitemap/...`
+- A `discovery_diff` processor compares sitemap IDs against the current catalog and appends `added` and `removed` rows to `processed/discovery/events/...`
 - Spot report scrapes write raw `/reports` payloads to `raw/spot_report/...`
-- Downstream processors publish canonical spot records to `processed/discovery/spots/...`
+- A `spot_report_processor` canonicalizes the payload, computes a checksum, and appends new version rows to the discovery dimension tables when content changes
+- A `catalog_builder` writes a replaceable serving snapshot to `processed/discovery/catalog_latest/`
+
+The version tables are the source of truth. `catalog_latest/` is a derived operational snapshot for fast reads.
 
 ## Key Conventions
 
@@ -148,8 +175,7 @@ Use partition-like path segments consistently:
 
 - `spot_id=<id>`
 - `scrape_date=YYYY-MM-DD`
-- `snapshot_date=YYYY-MM-DD`
-- `change_date=YYYY-MM-DD`
+- `event_date=YYYY-MM-DD`
 - `year=YYYY`
 - `month=MM`
 - `run_id=<id>`
@@ -158,7 +184,8 @@ Rules:
 
 - raw paths are append-only
 - processed historical paths are append-only
-- only `processed/.../latest/` is mutable
+- `processed/discovery/catalog_latest/` is replaceable derived state
+- `processed/forecast/latest/` remains the mutable latest forecast view
 - high-cardinality entities should be isolated by `spot_id=<id>` rather than embedded in filenames
 
 ## Object Metadata Requirements
@@ -196,11 +223,22 @@ Raw object creation is the orchestration boundary.
 
 Downstream processors should use the event payload plus the raw object contents to build `processed/` outputs.
 
+## Compression
+
+Recommended defaults:
+
+- raw JSON objects: `gzip`
+- processed Parquet tables: `snappy`
+
+`snappy` is the preferred Parquet codec because it provides strong read performance with good compression and broad engine support.
+
 ## Relationship To Existing Forecast Docs
 
 The existing forecast star schema remains valid, but it now sits inside the broader storage model:
 
 - [Data Layer Overview](README.md) - overall storage architecture
+- [Discovery Schema](discovery-schema.md) - discovery version tables and latest catalog shape
+- [Discovery Transformations](discovery-transformations.md) - checksum rules and event-driven discovery flow
 - [Forecast Schema](forecast-schema.md) - analytical table definitions under `processed/forecast/analytics/`
 - [Forecast Transformations](forecast-transformations.md) - how raw forecast payloads become analytical tables
 - [Forecast Queries](forecast-queries.md) - query examples against the analytical layer

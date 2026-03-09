@@ -1,6 +1,6 @@
 # Package Index
 
-> **Status: IMPLEMENTED** | Last verified: 2026-03-08
+> **Status: IMPLEMENTED / PLANNED** | Last verified: 2026-03-08
 
 All packages are managed via UV workspaces from the root `pyproject.toml`.
 
@@ -11,12 +11,12 @@ All packages are managed via UV workspaces from the root `pyproject.toml`.
 | [Forecast Scraper](../scrapers/forecast-scraper.md) | `packages/scrapers/forecast_scraper` | IMPLEMENTED | Scrapes 6 forecast endpoints per spot |
 | [Spot Scraper](../scrapers/spot-scraper.md) | `packages/scrapers/spot_scraper` | IMPLEMENTED | Scrapes spot metadata from `/reports` |
 | [Sitemap Scraper](../scrapers/sitemap-scraper.md) | `packages/scrapers/sitemap_scraper` | IMPLEMENTED | Parses Surfline sitemap XML |
-| [Taxonomy Scraper](../scrapers/taxonomy-scraper.md) | `packages/scrapers/taxonomy_scraper` | IMPLEMENTED | Walks Surfline geographic hierarchy |
-| Spot Reconciler | `packages/jobs/spot_reconciler` | IMPLEMENTED | Merges sitemap + taxonomy, detects changes |
+| [Taxonomy Scraper](../scrapers/taxonomy-scraper.md) | `packages/scrapers/taxonomy_scraper` | IMPLEMENTED | Legacy geographic hierarchy scraper |
+| [Discovery Processors](discovery-processors.md) | `packages/jobs/discovery_*` | PLANNED | Sitemap diff, spot report processing, latest catalog build |
+| [Spot Reconciler (legacy)](spot-reconciler.md) | `packages/jobs/spot_reconciler` | IMPLEMENTED | Earlier sitemap + taxonomy reconciliation approach |
 | [Archive Legacy Data](archive-legacy-data.md) | `packages/migrations/archive_legacy_data` | IMPLEMENTED | Data migration utilities |
 | [Dispatcher](dispatcher.md) | `packages/jobs/dispatcher` | PLANNED | Job orchestration |
 | [CLI](cli.md) | `packages/cli` | PLANNED | Command-line interface |
-| [Spot Reconciler (package)](spot-reconciler.md) | `packages/jobs/spot_reconciler` | IMPLEMENTED | Spot change detection |
 | [Frontend](frontend.md) | — | PLANNED | Web UI |
 | [API Package](api-package.md) | `packages/api` | PLANNED | REST API (FastAPI) |
 
@@ -24,11 +24,11 @@ All packages are managed via UV workspaces from the root `pyproject.toml`.
 
 | Dependency | Version | Used By |
 |------------|---------|---------|
-| `aws-lambda-powertools` | >= 3.23.0 | All scrapers, reconciler |
-| `boto3` | >= 1.42.15 | All scrapers, reconciler |
+| `aws-lambda-powertools` | >= 3.23.0 | All scrapers and discovery jobs |
+| `boto3` | >= 1.42.15 | All scrapers and discovery jobs |
 | `curl-cffi` | >= 0.14.0 | All scrapers |
 | `lxml` | — | Sitemap scraper |
-| `timezonefinder` | — | Taxonomy scraper |
+| `timezonefinder` | — | Taxonomy scraper only |
 
 ## Dev Dependencies
 

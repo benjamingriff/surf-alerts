@@ -1,25 +1,33 @@
 # System Overview
 
-> **Status: IMPLEMENTED** (current scrapers/infrastructure) | **PLANNED** (layered storage rework) | Last verified: 2026-03-08
+> **Status: IMPLEMENTED** (current scrapers/infrastructure) | **PLANNED** (layered storage and discovery rework) | Last verified: 2026-03-08
 
 ## Component Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Scheduled (EventBridge)                       │
-│                    Currently disabled                            │
+│                    Discovery entrypoint                          │
 └─────────────────────────────────────────────────────────────────┘
-         │                    │                        │
-         ▼                    ▼                        ▼
-  ┌──────────────┐   ┌───────────────┐      ┌─────────────────┐
-  │   Sitemap    │   │   Taxonomy    │      │ Spot Reconciler  │
-  │   Scraper    │   │   Scraper     │      │     (Job)        │
-  │  06:00 UTC   │   │  06:00 UTC    │      │   06:15 UTC      │
-  └──────┬───────┘   └──────┬────────┘      └────────┬─────────┘
-         │                   │                        │
-         ▼                   ▼                        ▼
-    raw/sitemap/       raw/taxonomy/        processed/discovery/
-    {date}/...         {date}/...           latest/ + changes/ + snapshots/
+         │
+         ▼
+  ┌──────────────┐
+  │   Sitemap    │
+  │   Scraper    │
+  │  06:00 UTC   │
+  └──────┬───────┘
+         │
+         ▼
+    raw/sitemap/{date}/...
+         │
+         ▼
+  ┌────────────────────┐
+  │  Discovery Diff    │
+  │  Lambda (planned)  │
+  └──────┬─────────────┘
+         │
+         ├──────────────▶ processed/discovery/events/...
+         └──────────────▶ SQS queue for spot scraper
 
 ┌─────────────────────────────────────────────────────────────────┐
 │                    SQS-Triggered Workers                        │
@@ -34,6 +42,12 @@
          │                                      │
          ▼                                      ▼
   raw/spot_report/...                 raw/forecast/...
+         │                                      │
+         ▼                                      ▼
+  Spot Report Processor                Forecast Processors
+     (planned)                           (planned)
+         │                                      │
+         ▼                                      ▼
   processed/discovery/...             processed/forecast/...
 
                          │
@@ -53,8 +67,10 @@
 | [Forecast Scraper](../scrapers/forecast-scraper.md) | SQS Worker | Active | Scrapes 6 Surfline forecast endpoints per spot |
 | [Spot Scraper](../scrapers/spot-scraper.md) | SQS Worker | Active | Scrapes spot metadata from `/reports` endpoint |
 | [Sitemap Scraper](../scrapers/sitemap-scraper.md) | Scheduled | Disabled | Parses Surfline sitemap XML for spot discovery |
-| [Taxonomy Scraper](../scrapers/taxonomy-scraper.md) | Scheduled | Disabled | Recursively walks Surfline geographic hierarchy |
-| Spot Reconciler | Scheduled | Disabled | Merges raw sitemap + taxonomy into processed discovery snapshots and change feeds |
+| Discovery Diff | S3/EventBridge Lambda | Planned | Compares sitemap IDs to current catalog and emits `added` / `removed` events |
+| Spot Report Processor | S3 Lambda | Planned | Computes checksums and appends new discovery versions from raw spot reports |
+| Catalog Builder | S3/Manifest Lambda | Planned | Rebuilds `processed/discovery/catalog_latest/` from version tables |
+| [Taxonomy Scraper](../scrapers/taxonomy-scraper.md) | Scheduled | Disabled | Legacy discovery path, not part of the target flow |
 | [Infrastructure](infrastructure.md) | CDK | Deployed | Lambda, SQS, S3, EventBridge |
 | [CI/CD](../operations/ci-cd.md) | GitHub Actions | Active | OIDC deploy on push to main |
 
@@ -87,3 +103,9 @@ members = [
     "packages/scrapers/spot_scraper",
 ]
 ```
+
+Planned additions to the workspace for the target discovery flow:
+
+- `packages/jobs/discovery_diff`
+- `packages/jobs/spot_report_processor`
+- `packages/jobs/catalog_builder`

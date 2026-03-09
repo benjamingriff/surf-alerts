@@ -15,8 +15,10 @@
                     ▼                     ▼
     ┌───────────────────────┐   ┌───────────────────────┐
     │ Current Snapshots     │   │ Historical Analytics  │
-    │ (processed/forecast/  │   │ (processed/forecast/  │
-    │ latest/ on S3)        │   │ analytics/ + DuckDB)  │
+    │ (processed/discovery/ │   │ (processed/forecast/  │
+    │ catalog_latest/ +     │   │ analytics/ + DuckDB)  │
+    │ processed/forecast/   │   │                       │
+    │ latest/ on S3)        │   │                       │
     └───────────┬───────────┘   └───────────┬───────────┘
                 │                           │
                 └─────────────┬─────────────┘
@@ -32,9 +34,9 @@
                     └───────────────────┘
 ```
 
-### Current Forecast Layer (S3 Canonical Snapshots)
+### Current Snapshot Layer (S3 Canonical Snapshots)
 
-For low-latency current forecast queries:
+For low-latency current forecast and spot metadata queries:
 
 **Why S3-first now:**
 - Matches the current infrastructure direction
@@ -43,9 +45,10 @@ For low-latency current forecast queries:
 - Works well for immutable per-scrape objects and mutable `latest/` snapshots
 
 **Storage approach:**
+- replaceable latest discovery catalog under `processed/discovery/catalog_latest/`
 - immutable per-scrape canonical objects under `processed/forecast/canonical/`
 - mutable latest snapshot per spot under `processed/forecast/latest/`
-- API layer reads latest snapshot objects for current forecast endpoints
+- API layer reads the discovery latest catalog for `/spots` metadata and forecast latest snapshots for current forecast endpoints
 
 ### Historical Data Layer (Parquet + DuckDB)
 
@@ -82,7 +85,7 @@ For sub-10ms response times on popular spots:
 |-------|------------|-----------|
 | API Framework | FastAPI (Python) | Async, auto OpenAPI docs, Pydantic validation |
 | Hosting | Lambda + API Gateway | Serverless, scales to zero, pay-per-request |
-| Current store | S3 canonical snapshots | Simple source of truth for latest forecast objects |
+| Current store | S3 latest snapshots | Discovery catalog + latest forecast objects |
 | Historical DB | Parquet + DuckDB | Cost-effective, analytical queries |
 | Cache | CloudFront + ElastiCache | Edge caching + computed aggregates |
 | Auth | API Gateway API keys | Simple, built-in rate limiting |
@@ -134,6 +137,10 @@ Scraper Lambda
     ▼
 raw/... (S3)
     │
+    ├──▶ Discovery processors
+    │      - Append discovery Parquet version tables
+    │      - Rebuild processed/discovery/catalog_latest/
+    │
     ├──▶ Canonical processor
     │      - Write immutable per-scrape forecast object
     │      - Refresh processed/forecast/latest/<spot_id>
@@ -164,7 +171,7 @@ packages/api/
 │       │   ├── forecast.py      # Forecast business logic
 │       │   ├── history.py       # Historical queries
 │       │   ├── accuracy.py      # Accuracy calculations
-│       │   └── discovery.py     # Regional search logic
+│       │   └── discovery.py     # Spot catalog and regional search logic
 │       ├── repositories/
 │       │   ├── snapshots.py     # S3 latest snapshot reads
 │       │   └── parquet.py       # Parquet/DuckDB queries

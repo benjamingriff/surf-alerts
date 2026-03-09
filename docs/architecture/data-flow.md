@@ -29,12 +29,12 @@ Surfline API
 └───────┬────────┘
         │
         ▼
-┌────────────────┐     EventBridge / manifest-driven trigger
-│  Processor     │──── Transform raw payloads into canonical data
+┌────────────────┐     S3 object created / manifest-driven trigger
+│  Processor     │──── Transform raw payloads into Parquet + serving data
 │  (planned)     │
 └───────┬────────┘
         │
-        ├──▶ processed/...      Canonical operational snapshots
+        ├──▶ processed/...      Version tables, serving snapshots, analytics
         └──▶ control/...        Manifests, checkpoints, completion records
 ```
 
@@ -65,26 +65,44 @@ Surfline API
 1. SQS message arrives with `spot_id`, `bucket`, `prefix`
 2. Lambda makes 1 HTTP request to `/kbyg/spots/reports?spotId={spot_id}`
 3. Response written to `raw/spot_report/...`
-4. A downstream processor flattens it into canonical discovery data
+4. A downstream processor canonicalizes it, computes a checksum, and appends new discovery versions when content changes
 
 **Planned downstream outputs:**
-- `processed/discovery/spots/spot_id=<id>/latest.json.gz` - canonical spot record
-- `processed/discovery/latest/catalog.json.gz` - latest full catalog
+- `processed/discovery/dim_spots_core/...` - append-only version anchor table
+- `processed/discovery/dim_spot_*/...` - append-only child dimension tables
+- `processed/discovery/events/...` - append-only `added`, `changed`, `removed` lifecycle events
+- `processed/discovery/catalog_latest/...` - derived latest live catalog for operational reads
 
-### Scheduled Scraper Flow (Currently Disabled)
+### Discovery Flow (Planned Target)
 
 ```
 EventBridge Cron
      │
-     ├── 06:00 UTC ──▶ Sitemap Scraper ──▶ raw/sitemap/...
+     └── 06:00 UTC ──▶ Sitemap Scraper ──▶ raw/sitemap/...
+                                      │
+                                      ▼
+                           Discovery Diff Lambda
+                           ├── Reads: raw sitemap + latest catalog
+                           ├── Writes: processed/discovery/events/... (`added`, `removed`)
+                           └── Enqueues: new spot IDs for spot scraper
+
+SQS / S3 Event
      │
-     ├── 06:00 UTC ──▶ Taxonomy Scraper ──▶ raw/taxonomy/...
-     │                  (recursive, 500ms delay between requests)
+     └──▶ Spot Scraper ──▶ raw/spot_report/...
+                              │
+                              ▼
+                     Spot Report Processor Lambda
+                     ├── Canonicalizes spot payload
+                     ├── Computes checksum
+                     ├── Writes: processed/discovery/dim_spots_core/...
+                     ├── Writes: processed/discovery/dim_spot_*/...
+                     └── Writes: processed/discovery/events/... (`changed`)
+
+S3 Event / manifest trigger
      │
-     └── 06:15 UTC ──▶ Spot Reconciler / Discovery Processor
-                        ├── Reads: raw sitemap + raw taxonomy + previous latest state
-                        ├── Merges and detects changes (SHA256 checksums)
-                        └── Writes: processed/discovery/snapshots/, changes/, latest/
+     └──▶ Catalog Builder Lambda
+            ├── Reads: append-only discovery Parquet tables
+            └── Writes: processed/discovery/catalog_latest/...
 ```
 
 ## Planned Pipeline (Not Yet Implemented)
@@ -92,20 +110,21 @@ EventBridge Cron
 ```
 S3 raw layer
      │
-     ├──▶ Processor ──▶ processed canonical layer
-     │                   - discovery snapshots and changes
-     │                   - per-spot latest forecast
+     ├──▶ Discovery processors ──▶ processed discovery layer
+     │                             - append-only version tables
+     │                             - append-only lifecycle events
+     │                             - latest catalog snapshot
      │
-     ├──▶ Processor ──▶ processed analytics layer
+     ├──▶ Forecast processors ──▶ processed analytics layer
      │                   - forecast Parquet archive
      │                   - partitioned by year/month/spot_id
      │
      └──▶ Future API / query layer
-                         - current reads from processed latest snapshots
+                         - current reads from discovery and forecast latest snapshots
                          - historical reads from Parquet
 ```
 
-See [Storage Layout](../data_architecture/storage-layout.md) for the bucket layout, [Forecast Schema](../data_architecture/forecast-schema.md) for the Parquet table definitions, and [API Design](../api/README.md) for the planned API.
+See [Storage Layout](../data_architecture/storage-layout.md) for the bucket layout, [Discovery Schema](../data_architecture/discovery-schema.md) for the discovery Parquet tables, [Forecast Schema](../data_architecture/forecast-schema.md) for the forecast Parquet tables, and [API Design](../api/README.md) for the planned API.
 
 ## Error Handling
 
@@ -115,4 +134,4 @@ See [Storage Layout](../data_architecture/storage-layout.md) for the bucket layo
 | Rate limiting (429) | Caught by retry logic, logged with headers |
 | Lambda failures | SQS visibility timeout (3x function timeout), then retry |
 | Persistent failures | Dead-letter queue after 3 failed attempts, 7-day retention |
-| Taxonomy rate limiting | 500ms delay between every request |
+| Taxonomy rate limiting | 500ms delay between every request (legacy flow only) |

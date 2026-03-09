@@ -40,7 +40,6 @@ Those are both valid, but they should live inside one storage architecture inste
 - forecast scrape envelopes
 - raw spot `/reports` responses
 - sitemap snapshots
-- taxonomy snapshots
 
 Raw data is append-only and short-lived. It exists to support replay, debugging, and downstream processing, not direct serving.
 
@@ -48,8 +47,9 @@ Raw data is append-only and short-lived. It exists to support replay, debugging,
 
 `processed/` stores the usable outputs:
 
-- canonical discovery snapshots and per-spot records
-- discovery change feeds
+- append-only discovery version tables
+- append-only discovery events
+- derived latest discovery catalog snapshots
 - canonical per-scrape forecast objects
 - mutable latest forecast snapshots
 - analytical forecast Parquet tables
@@ -64,11 +64,15 @@ This is the long-lived layer downstream code should consume.
 
 ### Discovery Domain
 
-The sitemap, taxonomy, and spot-report scrapers feed a shared discovery model:
+The discovery flow is centered on sitemap-driven lifecycle detection plus spot-report-driven metadata versioning:
 
-- raw sitemap and taxonomy snapshots land in `raw/`
-- reconciliation produces catalog snapshots and change feeds in `processed/discovery/`
-- raw spot reports are transformed into canonical spot records in `processed/discovery/spots/`
+- raw sitemap snapshots land in `raw/sitemap/`
+- a discovery diff processor emits `added` and `removed` events
+- raw spot reports land in `raw/spot_report/`
+- a spot report processor computes checksums and appends new discovery versions when content changes
+- a catalog builder materializes the latest live catalog from the append-only discovery tables
+
+This uses logical SCD2 semantics without mutating Parquet rows in place. Current state is derived from the highest `version_ts` per `spot_id`.
 
 ### Forecast Domain
 
@@ -97,6 +101,8 @@ Retention should be short for `raw/` and long-lived for `processed/` and `contro
 | Page | Contents |
 |------|----------|
 | [Storage Layout](storage-layout.md) | Top-level prefixes, directory conventions, retention, event contract |
+| [Discovery Schema](discovery-schema.md) | Versioned Parquet tables for discovery history and latest catalog builds |
+| [Discovery Transformations](discovery-transformations.md) | Checksum rules, event detection, and latest catalog materialization |
 | [Forecast Schema](forecast-schema.md) | Analytical table definitions under `processed/forecast/analytics/` |
 | [Forecast Transformations](forecast-transformations.md) | How raw forecast payloads become analytical tables |
 | [Forecast Queries](forecast-queries.md) | Example SQL against the forecast analytical layer |

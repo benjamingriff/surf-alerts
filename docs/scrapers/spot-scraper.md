@@ -21,7 +21,7 @@ This is the richest spot endpoint — returns name, location, timezone, cameras,
 1. Receives SQS message with `spot_id`, `bucket`, `prefix`
 2. Makes 1 HTTP request to Surfline `/reports` endpoint
 3. Writes the raw `/reports` response to S3
-4. A downstream processor flattens the payload into canonical spot data
+4. A downstream processor canonicalizes the payload, computes a checksum, and appends new discovery versions when content changes
 
 ## Raw Output Format
 
@@ -31,9 +31,9 @@ The scraper should write the unflattened Surfline `/reports` payload into the ra
 raw/spot_report/spot_id=<spot_id>/scrape_date=YYYY-MM-DD/run_id=<run_id>.json.gz
 ```
 
-## Processed Canonical Shape
+## Canonical Spot Shape
 
-Downstream processing should publish a canonical spot record shaped like:
+Downstream processing should first build a canonical spot object shaped like:
 
 ```json
 {
@@ -78,11 +78,24 @@ Downstream processing should publish a canonical spot record shaped like:
 }
 ```
 
-Recommended processed key shape:
+This canonical object is then normalized into the Parquet discovery model:
 
-```text
-processed/discovery/spots/spot_id=<spot_id>/latest.json.gz
-```
+- `processed/discovery/dim_spots_core/...`
+- `processed/discovery/dim_spot_location/...`
+- `processed/discovery/dim_spot_breadcrumbs/...`
+- `processed/discovery/dim_spot_cameras/...`
+- `processed/discovery/dim_spot_ability_levels/...`
+- `processed/discovery/dim_spot_board_types/...`
+- `processed/discovery/dim_spot_travel_details/...`
+
+If the canonicalized payload produces the same checksum as the latest known version for that `spot_id`, no new rows should be written.
+
+If the checksum differs, the processor should:
+
+1. Append a `changed` row to `processed/discovery/events/...`
+2. Append a new version row to `dim_spots_core`
+3. Append new child rows keyed by the new `spot_version_id`
+4. Trigger a rebuild of `processed/discovery/catalog_latest/`
 
 ## Infrastructure
 
@@ -94,4 +107,4 @@ processed/discovery/spots/spot_id=<spot_id>/latest.json.gz
 | SQS batch size | 1 |
 | DLQ max receives | 3 |
 
-See [Surfline Spot Endpoints](../surfline/spot-endpoints.md) for the raw API response schema and [Storage Layout](../data_architecture/storage-layout.md) for the target bucket structure.
+See [Surfline Spot Endpoints](../surfline/spot-endpoints.md) for the raw API response schema, [Discovery Schema](../data_architecture/discovery-schema.md) for the Parquet model, and [Storage Layout](../data_architecture/storage-layout.md) for the target bucket structure.

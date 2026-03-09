@@ -116,4 +116,18 @@ Log level controlled by `POWERTOOLS_LOG_LEVEL` environment variable (default: `I
 | [Forecast Scraper](forecast-scraper.md) | SQS | 6 forecast APIs | Per-spot forecasts |
 | [Spot Scraper](spot-scraper.md) | SQS | 1 reports API | Spot metadata |
 | [Sitemap Scraper](sitemap-scraper.md) | EventBridge | Sitemap XML | Spot discovery |
-| [Taxonomy Scraper](taxonomy-scraper.md) | EventBridge | Taxonomy API | Geographic hierarchy |
+| [Taxonomy Scraper](taxonomy-scraper.md) | EventBridge | Taxonomy API | Legacy geographic hierarchy |
+
+## Planned Discovery Processors
+
+The target discovery flow adds processor Lambdas downstream of raw S3 writes:
+
+- `discovery_diff`
+  - triggered from raw sitemap ingest
+  - emits `added` and `removed` lifecycle events
+  - queues new spot IDs for the spot scraper
+- `spot_report_processor`
+  - triggered from raw spot report ingest
+  - canonicalizes payloads, computes checksums, and appends new discovery versions
+- `catalog_builder`
+  - rebuilds `processed/discovery/catalog_latest/` from the append-only discovery Parquet tables

@@ -2,7 +2,7 @@
 
 > **Status: PLANNED** | Not yet implemented
 
-Design spec for the Surf Forecast API, which will serve current forecasts from processed canonical snapshots and historical data from the normalized forecast analytics model.
+Design spec for the Surf Forecast API, which will serve current forecasts from processed canonical snapshots, spot metadata from the latest discovery catalog, and historical data from normalized Parquet models.
 
 ## Purpose
 
@@ -39,6 +39,8 @@ Spots are the primary resource. Forecasts are sub-resources of spots.
 /spots/{id}/accuracy            → Forecast accuracy metrics
 /spots/{id}/scrapes             → Available scrape timestamps
 ```
+
+Spot metadata should come from `processed/discovery/catalog_latest/`, which is rebuilt from the append-only discovery version tables.
 
 ### 2. Composable
 
@@ -129,4 +131,4 @@ GET /spots/{id}/forecast?units=imperial
 | Page | Contents |
 |------|----------|
 | [Endpoints](endpoints.md) | All 10 endpoint specs with request/response examples |
-| [Implementation Guide](implementation-guide.md) | DB architecture, tech stack, ETL pipeline, project structure |
+| [Implementation Guide](implementation-guide.md) | Storage architecture, tech stack, ETL pipeline, project structure |

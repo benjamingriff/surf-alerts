@@ -22,6 +22,8 @@ GET https://www.surfline.com/sitemaps/spots.xml
 4. Extracts spot IDs from URLs using regex: `surfline.com/surf-report/[name]/([spot_id])(/forecast)?`
 5. Writes raw sitemap results to S3
 
+In the target architecture, the sitemap is the **source of the live spot universe**. It is not joined with taxonomy during normal processing.
+
 ## URL Pattern
 
 The sitemap contains two URL types per spot:
@@ -57,6 +59,13 @@ Payload shape:
 }
 ```
 
+These fields are enough to:
+
+- detect new spot IDs
+- detect missing spot IDs
+- preserve the latest known report and forecast URLs
+- enqueue new IDs for spot metadata scraping
+
 ## Additional Dependencies
 
 - `lxml` — XML parsing (not used by other scrapers)
@@ -69,6 +78,17 @@ Payload shape:
 | Timeout | 60s |
 | Status | Disabled |
 
-The sitemap output is later reconciled with taxonomy data into `processed/discovery/...`.
+## Planned Downstream Flow
+
+Raw sitemap ingestion should trigger a `discovery_diff` processor which:
+
+1. Reads the current latest catalog from `processed/discovery/catalog_latest/`
+2. Compares the new sitemap ID set against current live `spot_id`s
+3. Appends `added` and `removed` events to `processed/discovery/events/...`
+4. Queues `added` IDs for spot report scraping
+
+Most `changed` events do not come from the sitemap. They come later from spot report refreshes and checksum comparison.
+
+Taxonomy is not part of the active target discovery flow.
 
 See [Surfline Taxonomy & Search](../surfline/taxonomy-and-search.md) for the sitemap API details and [Storage Layout](../data_architecture/storage-layout.md) for the target bucket structure.

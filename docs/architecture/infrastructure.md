@@ -64,14 +64,26 @@ Creates a Docker Lambda triggered by EventBridge cron. Currently **disabled** fo
 | Scraper | Schedule | Timeout | Notes |
 |---------|----------|---------|-------|
 | Sitemap Scraper | 06:00 UTC | 60s | Disabled |
-| Taxonomy Scraper | 06:00 UTC | 600s (10min) | Disabled, recursive API calls |
-| Spot Reconciler | 06:15 UTC | 60s | Disabled, runs after sitemap + taxonomy |
+| Taxonomy Scraper | 06:00 UTC | 600s (10min) | Disabled, legacy recursive API calls |
+| Spot Reconciler | 06:15 UTC | 60s | Disabled, legacy discovery job |
 
 **Components per scheduled scraper:**
 - Docker Lambda
 - EventBridge rule with cron schedule
 - S3 read/write permissions
 - Environment: `BUCKET_NAME` injected
+
+## Planned Discovery Processors
+
+The target discovery design adds Lambda-style processors downstream of raw S3 writes:
+
+| Processor | Trigger | Role |
+|-----------|---------|------|
+| Discovery Diff | S3 object created on `raw/sitemap/...` | Emits `added` / `removed` events and queues new spot IDs |
+| Spot Report Processor | S3 object created on `raw/spot_report/...` | Computes checksums and appends discovery version rows |
+| Catalog Builder | Processing manifest or S3 event | Rebuilds `processed/discovery/catalog_latest/` |
+
+These processors are planned only. They are not currently defined in the CDK stack.
 
 ### CI/CD IAM (GitHubActionsCdkDeployRole)
 
