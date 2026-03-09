@@ -39,7 +39,7 @@ interface ScraperWorkerProps {
 - SQS queue with DLQ (via SqsQueue construct)
 - Event source mapping (batch size: 1, reports batch item failures)
 - S3 read/write permissions on data bucket
-- Environment: `POWERTOOLS_LOG_LEVEL=INFO`
+- Environment: `POWERTOOLS_LOG_LEVEL=WARNING`
 
 ### SqsQueue Construct
 

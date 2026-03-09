@@ -13,6 +13,7 @@ export interface ScraperWorkerProps {
   timeout: number;
   memorySize: number;
   maxConcurrency?: number;
+  environment?: Record<string, string>;
 }
 
 export class ScraperWorker extends Construct {
@@ -50,7 +51,8 @@ export class ScraperWorker extends Construct {
         timeout: cdk.Duration.seconds(props.timeout),
         functionName: `${props.projectName}-${props.scraperName}`,
         environment: {
-          POWERTOOLS_LOG_LEVEL: "INFO",
+          POWERTOOLS_LOG_LEVEL: "WARNING",
+          ...props.environment,
         },
       },
     );

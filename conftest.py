@@ -1,5 +1,7 @@
 import os
 import logging
+from types import SimpleNamespace
+
 import boto3
 import pytest
 from moto import mock_aws
@@ -39,3 +41,13 @@ def s3():
             CreateBucketConfiguration={"LocationConstraint": AWS_REGION},
         )
         yield s3_client
+
+
+@pytest.fixture
+def lambda_context():
+    return SimpleNamespace(
+        function_name="test-function",
+        memory_limit_in_mb=1024,
+        invoked_function_arn="arn:aws:lambda:eu-west-2:123456789012:function:test-function",
+        aws_request_id="request-id-123",
+    )

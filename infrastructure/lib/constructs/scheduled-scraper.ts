@@ -14,6 +14,7 @@ export interface ScheduledScraperProps {
   memorySize: number;
   schedule: events.Schedule;
   bucket: s3.IBucket;
+  environment?: Record<string, string>;
 }
 
 export class ScheduledScraper extends Construct {
@@ -42,8 +43,10 @@ export class ScheduledScraper extends Construct {
         timeout: cdk.Duration.seconds(props.timeout),
         functionName: `${props.projectName}-${props.scraperName}`,
         environment: {
-          POWERTOOLS_LOG_LEVEL: "INFO",
+          POWERTOOLS_LOG_LEVEL: "WARNING",
           BUCKET_NAME: props.bucket.bucketName,
+          DATA_BUCKET: props.bucket.bucketName,
+          ...props.environment,
         },
       },
     );
