@@ -61,9 +61,7 @@ def _parse_travel_details(details: dict | None) -> dict | None:
 def scrape_spot(spot_id: str) -> dict:
     logger.info("Scraping spot", extra={"spot_id": spot_id})
 
-    url = SPOT_REPORTS_URL.format(spot_id)
-    response = make_request(url)
-    data = response.json()
+    data = fetch_spot_report(spot_id)
 
     spot_data = _parse_spot_data(spot_id, data)
 
@@ -77,3 +75,9 @@ def scrape_spot(spot_id: str) -> dict:
         extra={"spot_id": spot_id, "spot_name": spot_data.get("name")},
     )
     return result
+
+
+def fetch_spot_report(spot_id: str) -> dict:
+    url = SPOT_REPORTS_URL.format(spot_id)
+    response = make_request(url)
+    return response.json()

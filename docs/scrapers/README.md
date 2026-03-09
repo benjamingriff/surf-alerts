@@ -107,7 +107,7 @@ AWS Lambda Powertools structured logging. Service names:
 - `taxonomy-scraper`
 - `spot-reconciler`
 
-Log level controlled by `POWERTOOLS_LOG_LEVEL` environment variable (default: `INFO`).
+Log level controlled by `POWERTOOLS_LOG_LEVEL` environment variable (default: `WARNING`).
 
 ## Scrapers
 

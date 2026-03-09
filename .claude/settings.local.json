@@ -11,7 +11,19 @@
       "Bash(npm run build:*)",
       "Bash(ruff check:*)",
       "Bash(python:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebFetch(domain:mobbin.com)",
+      "Bash(npx tsc:*)",
+      "Bash(pytest:*)",
+      "Bash(npm test:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(xargs:*)",
+      "Bash(tr:*)",
+      "Bash(for f in packages/cli/README.md packages/frontend/README.md packages/jobs/dispatcher/README.md packages/jobs/spot_reconciler/README.md packages/migrations/archive_legacy_data/README.md packages/scrapers/forecast_scraper/README.md packages/scrapers/sitemap_scraper/README.md packages/scrapers/spot_scraper/README.md packages/scrapers/taxonomy_scraper/README.md)",
+      "Bash(do echo \"=== $f ===\")",
+      "Read(//Users/benjamingriffiths/repos/surf-alerts/**)",
+      "Bash(done)"
     ]
   }
 }

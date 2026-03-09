@@ -18,7 +18,7 @@ Responsibilities:
 - append `added` and `removed` rows to `processed/discovery/events/...`
 - enqueue new IDs for the spot scraper
 
-### `packages/jobs/spot_report_processor`
+### `packages/jobs/discovery_spot_history_processor`
 
 Triggered after a new raw spot report object lands.
 
@@ -31,7 +31,7 @@ Responsibilities:
 - append a `changed` event when the checksum differs
 - append new version rows to discovery dimension tables
 
-### `packages/jobs/catalog_builder`
+### `packages/jobs/discovery_catalog_builder`
 
 Triggered after new discovery versions are written.
 
