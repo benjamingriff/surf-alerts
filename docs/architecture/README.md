@@ -64,12 +64,15 @@
 
 | Component | Type | Status | Description |
 |-----------|------|--------|-------------|
-| [Forecast Scraper](../scrapers/forecast-scraper.md) | SQS Worker | Active | Scrapes 6 Surfline forecast endpoints per spot |
+| [Forecast Scraper](../scrapers/forecast-scraper.md) | SQS Worker | Active | Scrapes 6 Surfline forecast endpoints per spot inside a timezone batch |
 | [Spot Scraper](../scrapers/spot-scraper.md) | SQS Worker | Active | Scrapes spot metadata from `/reports` endpoint |
 | [Sitemap Scraper](../scrapers/sitemap-scraper.md) | Scheduled | Disabled | Parses Surfline sitemap XML for spot discovery |
 | Discovery Diff | S3/EventBridge Lambda | Planned | Compares sitemap IDs to current catalog and emits `added` / `removed` events |
 | Spot Report Processor | S3 Lambda | Planned | Computes checksums and appends new discovery versions from raw spot reports |
 | Catalog Builder | S3/Manifest Lambda | Planned | Rebuilds `processed/discovery/catalog_latest/` from version tables |
+| Forecast Batch Planner | Scheduler/Manifest Lambda | Planned | Creates timezone-local forecast batch manifests and enqueues spot scrapes |
+| Forecast Batch Completion | S3/Manifest Lambda | Planned | Emits processing manifests when all batch completion markers are present |
+| Forecast Processor | Manifest Lambda | Planned | Writes canonical forecast, presentation, and history outputs from completed batches |
 | [Taxonomy Scraper](../scrapers/taxonomy-scraper.md) | Scheduled | Disabled | Legacy discovery path, not part of the target flow |
 | [Infrastructure](infrastructure.md) | CDK | Deployed | Lambda, SQS, S3, EventBridge |
 | [CI/CD](../operations/ci-cd.md) | GitHub Actions | Active | OIDC deploy on push to main |
@@ -109,3 +112,6 @@ Planned additions to the workspace for the target discovery flow:
 - `packages/jobs/discovery_diff`
 - `packages/jobs/spot_report_processor`
 - `packages/jobs/catalog_builder`
+- `packages/jobs/forecast_batch_planner`
+- `packages/jobs/forecast_batch_completion`
+- `packages/jobs/forecast_processor`

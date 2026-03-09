@@ -13,6 +13,7 @@ All packages are managed via UV workspaces from the root `pyproject.toml`.
 | [Sitemap Scraper](../scrapers/sitemap-scraper.md) | `packages/scrapers/sitemap_scraper` | IMPLEMENTED | Parses Surfline sitemap XML |
 | [Taxonomy Scraper](../scrapers/taxonomy-scraper.md) | `packages/scrapers/taxonomy_scraper` | IMPLEMENTED | Legacy geographic hierarchy scraper |
 | [Discovery Processors](discovery-processors.md) | `packages/jobs/discovery_*` | PLANNED | Sitemap diff, spot report processing, latest catalog build |
+| [Forecast Processors](forecast-processors.md) | `packages/jobs/forecast_*` | PLANNED | Batch planning, completion detection, canonical forecast processing |
 | [Spot Reconciler (legacy)](spot-reconciler.md) | `packages/jobs/spot_reconciler` | IMPLEMENTED | Earlier sitemap + taxonomy reconciliation approach |
 | [Archive Legacy Data](archive-legacy-data.md) | `packages/migrations/archive_legacy_data` | IMPLEMENTED | Data migration utilities |
 | [Dispatcher](dispatcher.md) | `packages/jobs/dispatcher` | PLANNED | Job orchestration |

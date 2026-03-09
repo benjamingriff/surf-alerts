@@ -1,10 +1,10 @@
 # Forecast Schema
 
-> **Status: IMPLEMENTED** (analytics schema) | Last verified: 2026-03-06
+> **Status: PLANNED** | Historical forecast table definitions for the layered forecast pipeline
 
-This page defines the **forecast analytics sublayer** stored under `processed/forecast/analytics/`.
+This page defines the forecast historical tables stored under `processed/forecast/history/`.
 
-For the broader bucket layout and canonical operational forecast objects, see [Storage Layout](storage-layout.md).
+These tables are the warehouse-oriented history layer behind the forecast pipeline. For the broader bucket layout and batch model, see [Storage Layout](storage-layout.md) and [Forecast Pipeline](forecast-pipeline.md).
 
 ## Schema Diagram
 
@@ -59,6 +59,22 @@ For the broader bucket layout and canonical operational forecast objects, see [S
                 │ dusk        │
                 └─────────────┘
 ```
+
+---
+
+## Storage And Join Conventions
+
+The historical forecast schema should follow these conventions:
+
+- partition primarily by time, using `year`, `month`, and `forecast_date`
+- keep `spot_id` as a column in every table
+- only add `spot_id` as a secondary partition if file-size testing justifies it
+- retain enough forecast-side location fields for standalone analysis, but use `spot_id` to join to discovery data for spot metadata
+
+Recommended joins:
+
+- historical forecast tables -> `processed/discovery/catalog_latest/...` for current spot metadata
+- historical forecast tables -> versioned discovery tables later if point-in-time joins are needed
 
 ---
 

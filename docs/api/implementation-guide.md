@@ -14,11 +14,13 @@
                     │                     │
                     ▼                     ▼
     ┌───────────────────────┐   ┌───────────────────────┐
-    │ Current Snapshots     │   │ Historical Analytics  │
+    │ Current Forecast +    │   │ Historical Forecast   │
+    │ Presentation          │   │ History               │
     │ (processed/discovery/ │   │ (processed/forecast/  │
-    │ catalog_latest/ +     │   │ analytics/ + DuckDB)  │
+    │ catalog_latest/ +     │   │ history/ + DuckDB)    │
     │ processed/forecast/   │   │                       │
-    │ latest/ on S3)        │   │                       │
+    │ canonical/ and        │   │                       │
+    │ presentation/ on S3)  │   │                       │
     └───────────┬───────────┘   └───────────┬───────────┘
                 │                           │
                 └─────────────┬─────────────┘
@@ -34,7 +36,7 @@
                     └───────────────────┘
 ```
 
-### Current Snapshot Layer (S3 Canonical Snapshots)
+### Current Forecast Layer (S3 Canonical + Presentation)
 
 For low-latency current forecast and spot metadata queries:
 
@@ -46,9 +48,9 @@ For low-latency current forecast and spot metadata queries:
 
 **Storage approach:**
 - replaceable latest discovery catalog under `processed/discovery/catalog_latest/`
-- immutable per-scrape canonical objects under `processed/forecast/canonical/`
-- mutable latest snapshot per spot under `processed/forecast/latest/`
-- API layer reads the discovery latest catalog for `/spots` metadata and forecast latest snapshots for current forecast endpoints
+- immutable canonical forecast objects under `processed/forecast/canonical/`
+- replaceable timezone-day presentation artifacts under `processed/forecast/presentation/`
+- API layer reads the discovery latest catalog for `/spots` metadata, canonical forecast batches for current forecast views, and presentation outputs for notification-style summaries
 
 ### Historical Data Layer (Parquet + DuckDB)
 
@@ -62,12 +64,12 @@ For analytical queries and historical access:
 
 **Partitioning strategy:**
 ```
-s3://surf-alerts-data/processed/forecast/analytics/
+s3://surf-alerts-data/processed/forecast/history/
   fact_rating/
     year=2026/
       month=01/
-        spot_id=584204204e65fad6a77090d2/
-          data_20260117.parquet
+        forecast_date=2026-01-17/
+          part-000.parquet
 ```
 
 ### Caching Layer
@@ -141,13 +143,11 @@ raw/... (S3)
     │      - Append discovery Parquet version tables
     │      - Rebuild processed/discovery/catalog_latest/
     │
-    ├──▶ Canonical processor
-    │      - Write immutable per-scrape forecast object
-    │      - Refresh processed/forecast/latest/<spot_id>
-    │
-    └──▶ Analytics processor
-           - Append Parquet to processed/forecast/analytics/
-           - Partition by year/month/spot_id
+    └──▶ Forecast processor
+           - Write immutable canonical forecast objects
+           - Publish processed/forecast/presentation/
+           - Append Parquet to processed/forecast/history/
+           - Partition by year/month/forecast_date
 ```
 
 ---

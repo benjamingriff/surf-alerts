@@ -38,23 +38,40 @@ Surfline API
         └──▶ control/...        Manifests, checkpoints, completion records
 ```
 
-### Forecast Scraper Flow
+### Forecast Flow (Planned Target)
 
-1. SQS message arrives with `spot_id`, `bucket`, `prefix`
-2. Lambda makes 6 sequential HTTP requests to Surfline:
-   - `/kbyg/spots/forecasts/rating` (5 days, hourly)
-   - `/kbyg/spots/forecasts/sunlight` (16 days, daily)
-   - `/kbyg/spots/forecasts/tides` (6 days, irregular)
-   - `/kbyg/spots/forecasts/wave` (5 days, hourly)
-   - `/kbyg/spots/forecasts/weather` (16 days, hourly)
-   - `/kbyg/spots/forecasts/wind` (5 days, hourly)
-3. Responses combined into one raw forecast envelope
-4. Gzip-compressed and written to `raw/forecast/...`
+```
+Hourly Scheduler Tick (UTC)
+     │
+     └──▶ Forecast Batch Planner
+            ├── Reads: processed/discovery/catalog_latest/...
+            ├── Groups: live spots by timezone
+            ├── Writes: control/manifests/forecast_batches/...
+            └── Enqueues: one forecast scrape per spot_id
 
-**Planned downstream outputs:**
-- `processed/forecast/canonical/...` - immutable per-scrape normalized object
-- `processed/forecast/latest/...` - mutable latest snapshot per spot
-- `processed/forecast/analytics/...` - analytical Parquet tables
+SQS
+     │
+     └──▶ Forecast Scraper ──▶ raw/forecast/...
+                              └──▶ control/completions/forecast_batches/...
+
+Raw write / completion marker
+     │
+     └──▶ Forecast Batch Completion
+            ├── Reads: batch manifest + completion markers
+            └── Writes: control/manifests/processing/domain=forecast/...
+
+Processing manifest
+     │
+     └──▶ Forecast Processor
+            ├── Reads: all raw forecast objects in the completed batch
+            ├── Writes: processed/forecast/canonical/...
+            ├── Writes: processed/forecast/presentation/...
+            └── Writes: processed/forecast/history/...
+```
+
+Key forecast rule:
+
+- the authoritative completion boundary is the timezone-local batch, not the individual raw object
 
 **Units requested:** `swellHeight=FT`, `waveHeight=FT`, `windSpeed=MPH`, `temperature=C`, `tideHeight=M`
 
@@ -115,16 +132,17 @@ S3 raw layer
      │                             - append-only lifecycle events
      │                             - latest catalog snapshot
      │
-     ├──▶ Forecast processors ──▶ processed analytics layer
-     │                   - forecast Parquet archive
-     │                   - partitioned by year/month/spot_id
+     ├──▶ Forecast processors ──▶ processed forecast layer
+     │                   - canonical per-spot batch outputs
+     │                   - timezone-day presentation artifacts
+     │                   - historical Parquet partitioned by forecast date
      │
      └──▶ Future API / query layer
-                         - current reads from discovery and forecast latest snapshots
-                         - historical reads from Parquet
+                         - current reads from discovery plus forecast canonical/presentation layers
+                         - historical reads from forecast history Parquet
 ```
 
-See [Storage Layout](../data_architecture/storage-layout.md) for the bucket layout, [Discovery Schema](../data_architecture/discovery-schema.md) for the discovery Parquet tables, [Forecast Schema](../data_architecture/forecast-schema.md) for the forecast Parquet tables, and [API Design](../api/README.md) for the planned API.
+See [Storage Layout](../data_architecture/storage-layout.md) for the bucket layout, [Forecast Pipeline](../data_architecture/forecast-pipeline.md) for the forecast batch model, [Discovery Schema](../data_architecture/discovery-schema.md) for the discovery Parquet tables, [Forecast Schema](../data_architecture/forecast-schema.md) for the forecast Parquet tables, and [API Design](../api/README.md) for the planned API.
 
 ## Error Handling
 

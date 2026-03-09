@@ -27,7 +27,7 @@ Those are both valid, but they should live inside one storage architecture inste
 |-----------|--------|-----------|
 | Bucket layout | One S3 bucket with layered prefixes | Simple lifecycle management, simpler permissions, no cross-bucket orchestration |
 | Landing layer | `raw/` | Immutable source payloads, replay/debug support, cheap expiry |
-| Usable layer | `processed/` | Canonical objects for operational reads plus analytical Parquet |
+| Usable layer | `processed/` | Canonical, presentation, and historical forecast outputs plus discovery tables |
 | Orchestration support | `control/` | Keeps manifests/checkpoints out of data prefixes |
 | Event boundary | Raw object creation | Natural handoff from scraper to processor |
 
@@ -51,7 +51,7 @@ Raw data is append-only and short-lived. It exists to support replay, debugging,
 - append-only discovery events
 - derived latest discovery catalog snapshots
 - canonical per-scrape forecast objects
-- mutable latest forecast snapshots
+- timezone-day presentation artifacts for notifications
 - analytical forecast Parquet tables
 
 This is the long-lived layer downstream code should consume.
@@ -76,12 +76,15 @@ This uses logical SCD2 semantics without mutating Parquet rows in place. Current
 
 ### Forecast Domain
 
-Forecast data has two processed outputs:
+Forecast data should be documented as a full layered pipeline:
 
-- **canonical operational objects** under `processed/forecast/`
-- **analytical Parquet tables** under `processed/forecast/analytics/`
+- raw per-spot forecast scrapes under `raw/forecast/`
+- timezone-batch manifests and completion markers under `control/`
+- canonical per-spot forecast objects under `processed/forecast/canonical/`
+- timezone-day presentation outputs under `processed/forecast/presentation/`
+- append-only historical Parquet under `processed/forecast/history/`
 
-The existing forecast star schema remains the right analytical model, but it is now documented as one sublayer of the broader storage architecture.
+The existing forecast star schema remains the right historical model, but it now sits behind explicit batch orchestration and presentation layers.
 
 ## Naming And Retention
 
@@ -103,6 +106,7 @@ Retention should be short for `raw/` and long-lived for `processed/` and `contro
 | [Storage Layout](storage-layout.md) | Top-level prefixes, directory conventions, retention, event contract |
 | [Discovery Schema](discovery-schema.md) | Versioned Parquet tables for discovery history and latest catalog builds |
 | [Discovery Transformations](discovery-transformations.md) | Checksum rules, event detection, and latest catalog materialization |
-| [Forecast Schema](forecast-schema.md) | Analytical table definitions under `processed/forecast/analytics/` |
-| [Forecast Transformations](forecast-transformations.md) | How raw forecast payloads become analytical tables |
-| [Forecast Queries](forecast-queries.md) | Example SQL against the forecast analytical layer |
+| [Forecast Pipeline](forecast-pipeline.md) | Timezone-batch orchestration, completion logic, canonical outputs, presentation, and history |
+| [Forecast Schema](forecast-schema.md) | Historical forecast table definitions under `processed/forecast/history/` |
+| [Forecast Transformations](forecast-transformations.md) | How completed forecast batches become canonical, presentation, and history outputs |
+| [Forecast Queries](forecast-queries.md) | Example SQL against the forecast historical layer |

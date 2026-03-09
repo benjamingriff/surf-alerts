@@ -23,11 +23,35 @@ Scrapes 6 Surfline forecast endpoints for a single spot per invocation. SQS-trig
 
 ## How It Works
 
-1. Receives SQS message with `spot_id`, `bucket`, `prefix`
+1. Receives SQS message with `spot_id`, `bucket`, `prefix`, and forecast batch metadata
 2. Makes 6 sequential HTTP requests to Surfline (curl-cffi, Chrome impersonation)
 3. Parses JSON responses
 4. Combines all 6 responses into a single raw forecast envelope
 5. Writes gzip-compressed JSON to S3 at `raw/forecast/...`
+6. Emits a completion marker for the batch member scrape
+
+The scraper is only the raw-layer writer. Batch completeness, canonicalization, presentation publishing, and history writes are handled downstream.
+
+## Batch Context
+
+Forecast scrapes are orchestrated as timezone-local batches rather than standalone spot refreshes.
+
+The scheduler should:
+
+1. run every hour in UTC
+2. determine which local timezone scrape times are due
+3. build one batch manifest per due timezone-local day
+4. enqueue one message per `spot_id` in that batch
+
+Each SQS message should carry:
+
+- `spot_id`
+- `batch_id`
+- `timezone`
+- `local_batch_date`
+- `scheduled_local_time`
+- `bucket`
+- `prefix`
 
 ## Raw Output Format
 
@@ -39,6 +63,9 @@ Two logical sections per scrape:
 ```json
 {
   "spot_id": "584204204e65fad6a77090d2",
+  "batch_id": "lon-2026-01-17-0700",
+  "timezone": "Europe/London",
+  "local_batch_date": "2026-01-17",
   "timestamp": "2026-01-17T14:43:39.398066",
   "scraper": "forecast"
 }
@@ -49,16 +76,19 @@ Two logical sections per scrape:
 Recommended raw key shape:
 
 ```text
-raw/forecast/spot_id=<spot_id>/scrape_date=YYYY-MM-DD/run_id=<run_id>.json.gz
+raw/forecast/timezone=<tz>/local_date=YYYY-MM-DD/batch_id=<batch_id>/spot_id=<spot_id>/run_id=<run_id>.json.gz
 ```
 
 ## Downstream Processed Outputs
 
-The raw forecast object is transformed into:
+The raw forecast object participates in a manifest-driven batch flow:
 
-- `processed/forecast/canonical/...` - immutable per-scrape normalized forecast
-- `processed/forecast/latest/spot_id=<id>/forecast.json.gz` - latest serving snapshot
-- `processed/forecast/analytics/...` - Parquet fact/dimension tables for historical queries
+- `control/completions/...` - per-spot completion marker for the batch
+- `processed/forecast/canonical/...` - immutable canonical forecast per spot within a completed batch
+- `processed/forecast/presentation/...` - one daily timezone-day notification-ready artifact
+- `processed/forecast/history/...` - append-only Parquet fact/dimension tables for long-term queries and warehouse loading
+
+The target flow should not depend on a mutable per-spot `latest/` forecast object. Consumers should read either canonical per-batch outputs or the timezone-day presentation layer, depending on the use case.
 
 ## Row Counts Per Scrape
 
@@ -81,4 +111,4 @@ The raw forecast object is transformed into:
 | SQS batch size | 1 |
 | DLQ max receives | 3 |
 
-See [Surfline Forecast Endpoints](../surfline/forecast-endpoints.md) for full API response schemas and [Storage Layout](../data_architecture/storage-layout.md) for the target bucket structure.
+See [Surfline Forecast Endpoints](../surfline/forecast-endpoints.md) for full API response schemas, [Forecast Pipeline](../data_architecture/forecast-pipeline.md) for the batch/control model, and [Storage Layout](../data_architecture/storage-layout.md) for the target bucket structure.

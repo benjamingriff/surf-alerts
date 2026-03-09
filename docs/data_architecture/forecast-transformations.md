@@ -1,10 +1,96 @@
 # Forecast Transformations
 
-> **Status: IMPLEMENTED** (analytics transform design) | Last verified: 2026-03-06
+> **Status: PLANNED** | Batch-driven rules for canonical forecast outputs, presentation publishing, and historical writes
 
-These transformations describe how raw forecast payloads become analytical Parquet tables under `processed/forecast/analytics/`.
+These transformations describe how completed forecast batches become:
 
-For the broader layered storage design, see [Storage Layout](storage-layout.md).
+- canonical per-spot forecast objects under `processed/forecast/canonical/`
+- timezone-day presentation outputs under `processed/forecast/presentation/`
+- append-only historical Parquet tables under `processed/forecast/history/`
+
+For the batch/control model, see [Forecast Pipeline](forecast-pipeline.md). For the table definitions, see [Forecast Schema](forecast-schema.md).
+
+## Source Roles
+
+Forecast processing uses two upstream sources with distinct responsibilities:
+
+- `raw/forecast/...`
+  - stores one immutable source envelope per scraped `spot_id`
+  - remains close to Surfline's source shape
+- `control/manifests/processing/domain=forecast/...`
+  - defines a complete timezone-local batch
+  - is the authoritative trigger for downstream processing
+
+Raw object creation alone should not trigger full forecast processing. Canonicalization and publication start only after batch completeness has been proven by the control layer.
+
+## Processor Flow
+
+### 1. Batch planner
+
+Steps:
+
+1. run hourly in UTC
+2. read the live discovery catalog
+3. group live spots by `timezone`
+4. determine which timezone-local scrape times are due
+5. write one batch manifest per due timezone-local day
+6. enqueue one forecast scrape request per `spot_id`
+
+### 2. Forecast scraper
+
+Steps:
+
+1. read one queued `spot_id` and batch context
+2. call the six Surfline forecast endpoints
+3. combine them into one raw forecast envelope
+4. write one raw object to `raw/forecast/...`
+5. write one completion marker under `control/completions/...`
+
+### 3. Batch completion checker
+
+Steps:
+
+1. read the batch manifest
+2. count the observed completion markers
+3. compare `completed_spot_count` to `expected_spot_count`
+4. when the counts match, write one processing manifest under `control/manifests/processing/domain=forecast/...`
+
+### 4. Forecast processor
+
+Steps:
+
+1. read all raw forecast objects in the completed batch
+2. validate that membership matches the batch manifest
+3. canonicalize each raw payload into the stable forecast business model
+4. write canonical outputs under `processed/forecast/canonical/...`
+5. publish one timezone-day presentation artifact under `processed/forecast/presentation/...`
+6. append rows to the historical Parquet tables under `processed/forecast/history/...`
+
+## Canonicalization Rules
+
+Before history rows or presentation outputs are written, each raw payload should be transformed into a canonical forecast object.
+
+Canonicalization rules should be documented as:
+
+1. Keep `spot_id`, `timezone`, `local_batch_date`, and `batch_id` with every canonical object.
+2. Normalize forecast timestamps to explicit `forecast_valid_at` fields.
+3. Preserve stable, semantically meaningful order where the source arrays rely on it, especially `swells`.
+4. Normalize missing values consistently as `null`.
+5. Record lineage with `source_run_id` and `source_raw_key`.
+6. Keep the canonical model independent from Surfline's endpoint-specific nesting.
+
+## Presentation Build Rules
+
+The presentation layer should be published once per `timezone + local_batch_date`.
+
+Processing rules:
+
+1. read all canonical outputs in the completed batch
+2. derive alert-oriented summary fields per `spot_id`
+3. rank or filter spots according to the notification logic
+4. write one timezone-day presentation artifact
+
+Presentation outputs should be derived state, safe to rebuild, and explicitly tied to the completed batch that produced them.
 
 ## Handling Nested Structures
 
@@ -61,33 +147,33 @@ Filtering reduces `fact_swells` from ~720 to ~240 rows per scrape (~67% storage 
 
 ---
 
-## Partitioning Strategy
+## Historical Partitioning Strategy
 
-### Chosen Strategy: `year/month/spot_id`
+### Chosen strategy: time-first Parquet
 
 ```
-s3://surf-alerts-data/processed/forecast/analytics/
+s3://surf-alerts-data/processed/forecast/history/
   fact_rating/
     year=2026/
       month=01/
-        spot_id=584204204e65fad6a77090d2/
-          data_20260117.parquet
-          data_20260118.parquet
+        forecast_date=2026-01-17/
+          part-000.parquet
+          part-001.parquet
 ```
 
 ### Rationale
 
 | Query Pattern | Partition Pruning |
 |---------------|-------------------|
-| "Last week's forecasts for spot X" | Prunes by month + spot_id |
-| "All spots on 2026-01-17" | Prunes by year/month |
-| "Historical data for spot X" | Prunes by spot_id across all partitions |
+| "All spots on 2026-01-17" | Prunes by year/month/forecast_date |
+| "Last week's forecasts for spot X" | Prunes by day partitions, then filters by `spot_id` |
+| "Load a time window into a warehouse" | Reads contiguous time partitions without scanning spot-specific directories |
 
 ### File Size Targets
 
 - **Target:** 1-5 MB per Parquet file
 - **Per scrape:** ~65 KB total (all tables combined)
-- **Recommendation:** Aggregate multiple scrapes per file (daily or weekly)
+- **Recommendation:** Compact multiple spots into shared daily files; avoid one file per spot per scrape
 
 ---
 
@@ -116,6 +202,17 @@ s3://surf-alerts-data/processed/forecast/analytics/
 | **Schema changes** | Easy (additive) | Migrations required |
 
 ---
+
+## Join Strategy
+
+Historical forecast rows should retain `spot_id` as a column in every table so they can join directly to discovery and spot-location data.
+
+Recommended joins:
+
+- historical forecast tables -> `processed/discovery/catalog_latest/...` for current operational metadata
+- historical forecast tables -> discovery version tables when point-in-time joins are needed later
+
+The forecast domain should not duplicate the spot-location source of truth beyond the forecast attributes already embedded in the historical tables.
 
 ## Storage Estimates
 
