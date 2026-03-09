@@ -1,62 +1,102 @@
 # Data Layer Overview
 
-> **Status: IMPLEMENTED** | Last verified: 2026-03-06
+> **Status: PLANNED** | Target architecture for the next storage/orchestration iteration
 
-## Problem Statement
+## Summary
 
-The forecast scraper produces deeply nested JSON files from 6 Surfline API endpoints. These files are excellent for storage but difficult to query efficiently. We need to:
+The data platform is moving from a flat "scraper writes JSON to S3" model toward a **partial medallion** structure with one S3 bucket and three top-level prefixes:
 
-1. Flatten nested structures into queryable columns
-2. Handle arrays (especially the `swells[]` array with 6 elements per wave entry)
-3. Support time-series queries across forecast types
-4. Enable joins between different forecast types (wave + wind + rating)
-5. Keep storage efficient with columnar compression
+- `raw/` - immutable, short-lived scraper outputs
+- `processed/` - durable canonical and analytical data
+- `control/` - manifests, checkpoints, and event bookkeeping
 
-## Solution Summary
+This keeps the design simple while making room for more event-driven orchestration and cleaner separation between source payloads and usable data products.
 
-**Approach:** Hybrid star schema with Parquet storage
+## Why This Change
+
+The current docs describe two real but disconnected data stories:
+
+1. Forecast data needs a normalized analytical model for time-series queries.
+2. Spot discovery data behaves more like operational snapshots and change feeds.
+
+Those are both valid, but they should live inside one storage architecture instead of being documented as separate patterns.
+
+## Chosen Approach
 
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
-| Storage Format | Parquet on S3 | Columnar compression, works with DuckDB/Athena/pandas |
-| Schema Style | Star schema (7 fact tables) | Different cardinalities per forecast type (16-384 rows) |
-| Swells Handling | Separate `fact_swells` table | Enables flexible swell queries without 42 sparse columns |
-| Partitioning | `year/month/spot_id` | Optimizes time-range + spot filtering |
+| Bucket layout | One S3 bucket with layered prefixes | Simple lifecycle management, simpler permissions, no cross-bucket orchestration |
+| Landing layer | `raw/` | Immutable source payloads, replay/debug support, cheap expiry |
+| Usable layer | `processed/` | Canonical objects for operational reads plus analytical Parquet |
+| Orchestration support | `control/` | Keeps manifests/checkpoints out of data prefixes |
+| Event boundary | Raw object creation | Natural handoff from scraper to processor |
 
-## Original Data Structure
+## Layer Model
 
-Each scrape produces two files per spot:
+### Raw
 
-### metadata.json
+`raw/` stores near-source payloads written by scrapers:
 
-```json
-{
-  "spot_id": "584204204e65fad6a77090d2",
-  "timestamp": "2026-01-17T14:43:39.398066",
-  "scraper": "forecast"
-}
-```
+- forecast scrape envelopes
+- raw spot `/reports` responses
+- sitemap snapshots
+- taxonomy snapshots
 
-### data.json
+Raw data is append-only and short-lived. It exists to support replay, debugging, and downstream processing, not direct serving.
 
-Contains 6 top-level forecast types: `rating`, `sunlight`, `tides`, `wave`, `weather`, `wind`.
+### Processed
 
-Each forecast type has this structure:
+`processed/` stores the usable outputs:
 
-```json
-{
-  "associated": { /* metadata: location, units, timestamps */ },
-  "data": { /* array(s) of forecast values */ },
-  "permissions": { /* API permission info */ }
-}
-```
+- canonical discovery snapshots and per-spot records
+- discovery change feeds
+- canonical per-scrape forecast objects
+- mutable latest forecast snapshots
+- analytical forecast Parquet tables
 
-See [Forecast Schema](forecast-schema.md) for the full target schema, [Forecast Transformations](forecast-transformations.md) for how nested structures are handled, and [Forecast Queries](forecast-queries.md) for example SQL.
+This is the long-lived layer downstream code should consume.
+
+### Control
+
+`control/` stores manifests, processing records, and checkpoints that support event-driven orchestration without mixing operational metadata into business data prefixes.
+
+## Domain View
+
+### Discovery Domain
+
+The sitemap, taxonomy, and spot-report scrapers feed a shared discovery model:
+
+- raw sitemap and taxonomy snapshots land in `raw/`
+- reconciliation produces catalog snapshots and change feeds in `processed/discovery/`
+- raw spot reports are transformed into canonical spot records in `processed/discovery/spots/`
+
+### Forecast Domain
+
+Forecast data has two processed outputs:
+
+- **canonical operational objects** under `processed/forecast/`
+- **analytical Parquet tables** under `processed/forecast/analytics/`
+
+The existing forecast star schema remains the right analytical model, but it is now documented as one sublayer of the broader storage architecture.
+
+## Naming And Retention
+
+Storage keys should consistently use partition-like segments such as:
+
+- `spot_id=<id>`
+- `scrape_date=YYYY-MM-DD`
+- `snapshot_date=YYYY-MM-DD`
+- `year=YYYY`
+- `month=MM`
+- `run_id=<id>`
+
+Retention should be short for `raw/` and long-lived for `processed/` and `control/`.
 
 ## Documentation
 
 | Page | Contents |
 |------|----------|
-| [Forecast Schema](forecast-schema.md) | Star schema diagram, all table definitions, field mappings |
-| [Forecast Transformations](forecast-transformations.md) | Nested structure handling, partitioning, storage estimates |
-| [Forecast Queries](forecast-queries.md) | Example queries and data reconstruction |
+| [Storage Layout](storage-layout.md) | Top-level prefixes, directory conventions, retention, event contract |
+| [Forecast Schema](forecast-schema.md) | Analytical table definitions under `processed/forecast/analytics/` |
+| [Forecast Transformations](forecast-transformations.md) | How raw forecast payloads become analytical tables |
+| [Forecast Queries](forecast-queries.md) | Example SQL against the forecast analytical layer |

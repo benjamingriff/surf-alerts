@@ -6,6 +6,8 @@ Scrapes 6 Surfline forecast endpoints for a single spot per invocation. SQS-trig
 
 **Package:** `packages/scrapers/forecast_scraper/`
 
+> **Storage note:** The current Lambda already combines the 6 endpoint responses before writing to S3. The raw/processed paths below describe the target storage contract after the layered storage rework.
+
 ## Endpoints Scraped
 
 | Endpoint | Days | Interval | Units Requested |
@@ -24,10 +26,12 @@ Scrapes 6 Surfline forecast endpoints for a single spot per invocation. SQS-trig
 1. Receives SQS message with `spot_id`, `bucket`, `prefix`
 2. Makes 6 sequential HTTP requests to Surfline (curl-cffi, Chrome impersonation)
 3. Parses JSON responses
-4. Combines all 6 responses into a single data structure
-5. Writes gzip-compressed JSON to S3 at `{prefix}.gz`
+4. Combines all 6 responses into a single raw forecast envelope
+5. Writes gzip-compressed JSON to S3 at `raw/forecast/...`
 
-## Output Format
+## Raw Output Format
+
+The forecast scraper should be treated as a **raw layer writer**. Each scrape lands as one immutable raw object keyed by `run_id`.
 
 Two logical sections per scrape:
 
@@ -41,6 +45,20 @@ Two logical sections per scrape:
 ```
 
 **data:** Contains 6 top-level keys (`rating`, `sunlight`, `tides`, `wave`, `weather`, `wind`), each with `associated`, `data`, and `permissions` objects from the Surfline API response.
+
+Recommended raw key shape:
+
+```text
+raw/forecast/spot_id=<spot_id>/scrape_date=YYYY-MM-DD/run_id=<run_id>.json.gz
+```
+
+## Downstream Processed Outputs
+
+The raw forecast object is transformed into:
+
+- `processed/forecast/canonical/...` - immutable per-scrape normalized forecast
+- `processed/forecast/latest/spot_id=<id>/forecast.json.gz` - latest serving snapshot
+- `processed/forecast/analytics/...` - Parquet fact/dimension tables for historical queries
 
 ## Row Counts Per Scrape
 
@@ -63,4 +81,4 @@ Two logical sections per scrape:
 | SQS batch size | 1 |
 | DLQ max receives | 3 |
 
-See [Surfline Forecast Endpoints](../surfline/forecast-endpoints.md) for full API response schemas.
+See [Surfline Forecast Endpoints](../surfline/forecast-endpoints.md) for full API response schemas and [Storage Layout](../data_architecture/storage-layout.md) for the target bucket structure.

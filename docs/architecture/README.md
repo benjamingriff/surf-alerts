@@ -1,6 +1,6 @@
 # System Overview
 
-> **Status: IMPLEMENTED** | Last verified: 2026-03-08
+> **Status: IMPLEMENTED** (current scrapers/infrastructure) | **PLANNED** (layered storage rework) | Last verified: 2026-03-08
 
 ## Component Diagram
 
@@ -18,9 +18,8 @@
   └──────┬───────┘   └──────┬────────┘      └────────┬─────────┘
          │                   │                        │
          ▼                   ▼                        ▼
-     spots/              taxonomy/              spots/latest/
-     {date}/             {date}/                state.json.gz
-     sitemap.json.gz     taxonomy.json.gz       changes.json.gz
+    raw/sitemap/       raw/taxonomy/        processed/discovery/
+    {date}/...         {date}/...           latest/ + changes/ + snapshots/
 
 ┌─────────────────────────────────────────────────────────────────┐
 │                    SQS-Triggered Workers                        │
@@ -34,15 +33,16 @@
   └──────┬───────┘                    └────────┬──────────┘
          │                                      │
          ▼                                      ▼
-  S3: {prefix}.gz                     S3: {prefix}.gz
-  (spot report)                       (6 forecast endpoints)
+  raw/spot_report/...                 raw/forecast/...
+  processed/discovery/...             processed/forecast/...
 
                          │
                          ▼
               ┌─────────────────────┐
-              │  S3 Data Bucket     │
-              │  {stack}-data       │
-              │  Encrypted, RETAIN  │
+              │  S3 Data Bucket      │
+              │  {stack}-data        │
+              │ raw/ processed/      │
+              │ control/             │
               └─────────────────────┘
 ```
 
@@ -54,7 +54,7 @@
 | [Spot Scraper](../scrapers/spot-scraper.md) | SQS Worker | Active | Scrapes spot metadata from `/reports` endpoint |
 | [Sitemap Scraper](../scrapers/sitemap-scraper.md) | Scheduled | Disabled | Parses Surfline sitemap XML for spot discovery |
 | [Taxonomy Scraper](../scrapers/taxonomy-scraper.md) | Scheduled | Disabled | Recursively walks Surfline geographic hierarchy |
-| Spot Reconciler | Scheduled | Disabled | Merges sitemap + taxonomy, detects spot changes |
+| Spot Reconciler | Scheduled | Disabled | Merges raw sitemap + taxonomy into processed discovery snapshots and change feeds |
 | [Infrastructure](infrastructure.md) | CDK | Deployed | Lambda, SQS, S3, EventBridge |
 | [CI/CD](../operations/ci-cd.md) | GitHub Actions | Active | OIDC deploy on push to main |
 
@@ -68,7 +68,7 @@
 | Infrastructure | AWS CDK (TypeScript) |
 | Compute | Docker Lambda |
 | Queuing | SQS with DLQ |
-| Storage | S3 (gzip JSON) |
+| Storage | S3 (`raw/`, `processed/`, `control/`) |
 | Package Manager | UV workspaces |
 | CI/CD | GitHub Actions + OIDC |
 

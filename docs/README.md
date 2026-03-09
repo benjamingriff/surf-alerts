@@ -1,6 +1,6 @@
 # Surf Alerts
 
-Personal surf forecast data platform. Scrapes forecast data from Surfline, stores it in S3, and (planned) serves it via a custom API.
+Personal surf forecast data platform. Scrapes surf and spot data from Surfline, stores it in S3, and is evolving toward a layered raw/processed storage model with event-driven downstream processing.
 
 ## Status Dashboard
 
@@ -9,7 +9,8 @@ Personal surf forecast data platform. Scrapes forecast data from Surfline, store
 | **Forecast Scraper** | IMPLEMENTED | 6 endpoints, Docker Lambda, SQS trigger |
 | **Spot Scraper** | IMPLEMENTED | Sitemap parsing + spot data collection |
 | **Infrastructure (CDK)** | IMPLEMENTED | Lambda, SQS, S3, GitHub Actions CI/CD |
-| **Forecast Data Model** | IMPLEMENTED | Star schema design, 7 fact/dim tables |
+| **Data Storage Architecture** | PLANNED | Partial medallion design: `raw/`, `processed/`, `control/` |
+| **Forecast Data Model** | IMPLEMENTED | Forecast analytics schema, 7 fact/dim tables |
 | **Surfline API Reference** | IMPLEMENTED | 16 endpoints documented, verified 2026-03-06 |
 | **API Design** | PLANNED | 10 endpoints designed, FastAPI + DuckDB |
 | **Legacy Data Migration** | PLANNED | 1TB+ JSON to Parquet, ~$6-8 estimated cost |
@@ -24,7 +25,9 @@ Personal surf forecast data platform. Scrapes forecast data from Surfline, store
 - [Architecture Overview](architecture/README.md) — how the system fits together
 - [Scraper Pattern](scrapers/README.md) — shared module structure for all scrapers
 - [Surfline API Reference](surfline/README.md) — all discovered Surfline endpoints
-- [Forecast Schema](data_architecture/forecast-schema.md) — Parquet star schema design
+- [Data Layer Overview](data_architecture/README.md) — storage architecture and layer model
+- [Storage Layout](data_architecture/storage-layout.md) — prefixes, retention, and event boundaries
+- [Forecast Schema](data_architecture/forecast-schema.md) — forecast analytics schema design
 - [API Design](api/README.md) — planned REST API spec
 
 ## Project Structure

@@ -1,6 +1,10 @@
 # Forecast Transformations
 
-> **Status: IMPLEMENTED** | Last verified: 2026-03-06
+> **Status: IMPLEMENTED** (analytics transform design) | Last verified: 2026-03-06
+
+These transformations describe how raw forecast payloads become analytical Parquet tables under `processed/forecast/analytics/`.
+
+For the broader layered storage design, see [Storage Layout](storage-layout.md).
 
 ## Handling Nested Structures
 
@@ -62,7 +66,7 @@ Filtering reduces `fact_swells` from ~720 to ~240 rows per scrape (~67% storage 
 ### Chosen Strategy: `year/month/spot_id`
 
 ```
-s3://surf-alerts-data/forecasts/
+s3://surf-alerts-data/processed/forecast/analytics/
   fact_rating/
     year=2026/
       month=01/

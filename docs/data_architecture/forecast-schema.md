@@ -1,6 +1,10 @@
 # Forecast Schema
 
-> **Status: IMPLEMENTED** | Last verified: 2026-03-06
+> **Status: IMPLEMENTED** (analytics schema) | Last verified: 2026-03-06
+
+This page defines the **forecast analytics sublayer** stored under `processed/forecast/analytics/`.
+
+For the broader bucket layout and canonical operational forecast objects, see [Storage Layout](storage-layout.md).
 
 ## Schema Diagram
 

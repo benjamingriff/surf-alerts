@@ -2,7 +2,7 @@
 
 > **Status: PLANNED** | Not yet implemented
 
-Design spec for the Surf Forecast API, which will serve both current forecasts and historical data from the normalized Parquet data model.
+Design spec for the Surf Forecast API, which will serve current forecasts from processed canonical snapshots and historical data from the normalized forecast analytics model.
 
 ## Purpose
 

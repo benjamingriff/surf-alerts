@@ -48,7 +48,7 @@ def lambda_handler(event: dict, context: LambdaContext):
 {
   "spot_id": "584204204e65fad6a77090d2",
   "bucket": "sufalertsstack-data",
-  "prefix": "forecasts/2026-01-17/584204204e65fad6a77090d2"
+  "prefix": "raw/forecast/spot_id=584204204e65fad6a77090d2/scrape_date=2026-01-17/run_id=abc123"
 }
 ```
 

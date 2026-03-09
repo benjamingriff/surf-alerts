@@ -2,7 +2,7 @@
 
 > **Status: PLANNED** | Not yet implemented
 
-## Database Architecture
+## Storage And Query Architecture
 
 ### Hybrid Architecture Overview
 
@@ -14,40 +14,38 @@
                     │                     │
                     ▼                     ▼
     ┌───────────────────────┐   ┌───────────────────────┐
-    │    Current Forecast   │   │   Historical Data     │
-    │    (PostgreSQL /      │   │   (Parquet on S3 +    │
-    │     Aurora Serverless)│   │    DuckDB / Athena)   │
+    │ Current Snapshots     │   │ Historical Analytics  │
+    │ (processed/forecast/  │   │ (processed/forecast/  │
+    │ latest/ on S3)        │   │ analytics/ + DuckDB)  │
     └───────────┬───────────┘   └───────────┬───────────┘
                 │                           │
                 └─────────────┬─────────────┘
                               │
                     ┌─────────┴─────────┐
-                    │     ETL Job       │
-                    │  (Scrape → Both)  │
+                    │  Processor Layer  │
+                    │ (raw -> processed)│
                     └─────────┬─────────┘
                               │
                     ┌─────────┴─────────┐
-                    │   Raw JSON (S3)   │
-                    │   from Scrapers   │
+                    │    Raw Layer      │
+                    │   (S3 raw/...)    │
                     └───────────────────┘
 ```
 
-### Current Forecast Layer (PostgreSQL)
+### Current Forecast Layer (S3 Canonical Snapshots)
 
 For low-latency current forecast queries:
 
-**Why PostgreSQL over DynamoDB:**
-- Natural joins between forecast types (wave + wind + rating)
-- SQL functions for unit conversion and aggregations
-- Better fit for computed endpoints (best windows, daily summary)
-- Easier development and debugging
-- Aurora Serverless for cost-effective scaling
+**Why S3-first now:**
+- Matches the current infrastructure direction
+- Avoids introducing a serving database before storage semantics settle
+- Keeps raw-to-processed lineage simple
+- Works well for immutable per-scrape objects and mutable `latest/` snapshots
 
-**Schema approach:**
-- Materialized view of "current" forecast (latest scrape only)
-- Refresh on each new scrape
-- Index on `(spot_id, forecast_ts)`
-- TTL cleanup for old data
+**Storage approach:**
+- immutable per-scrape canonical objects under `processed/forecast/canonical/`
+- mutable latest snapshot per spot under `processed/forecast/latest/`
+- API layer reads latest snapshot objects for current forecast endpoints
 
 ### Historical Data Layer (Parquet + DuckDB)
 
@@ -61,7 +59,7 @@ For analytical queries and historical access:
 
 **Partitioning strategy:**
 ```
-s3://surf-alerts-data/forecasts/
+s3://surf-alerts-data/processed/forecast/analytics/
   fact_rating/
     year=2026/
       month=01/
@@ -84,7 +82,7 @@ For sub-10ms response times on popular spots:
 |-------|------------|-----------|
 | API Framework | FastAPI (Python) | Async, auto OpenAPI docs, Pydantic validation |
 | Hosting | Lambda + API Gateway | Serverless, scales to zero, pay-per-request |
-| Current DB | Aurora Serverless v2 | PostgreSQL compatibility, auto-scaling |
+| Current store | S3 canonical snapshots | Simple source of truth for latest forecast objects |
 | Historical DB | Parquet + DuckDB | Cost-effective, analytical queries |
 | Cache | CloudFront + ElastiCache | Edge caching + computed aggregates |
 | Auth | API Gateway API keys | Simple, built-in rate limiting |
@@ -134,15 +132,15 @@ Authorization: Bearer your-api-key-here
 Scraper Lambda
     │
     ▼
-Raw JSON (S3)
+raw/... (S3)
     │
-    ├──▶ PostgreSQL (current forecast, last scrape only)
-    │      - Upsert by (spot_id, forecast_ts)
-    │      - Delete forecasts older than 7 days
+    ├──▶ Canonical processor
+    │      - Write immutable per-scrape forecast object
+    │      - Refresh processed/forecast/latest/<spot_id>
     │
-    └──▶ Parquet (historical archive)
-           - Append to partitioned files
-           - Partitioned by year/month/spot_id
+    └──▶ Analytics processor
+           - Append Parquet to processed/forecast/analytics/
+           - Partition by year/month/spot_id
 ```
 
 ---
@@ -168,7 +166,7 @@ packages/api/
 │       │   ├── accuracy.py      # Accuracy calculations
 │       │   └── discovery.py     # Regional search logic
 │       ├── repositories/
-│       │   ├── postgres.py      # PostgreSQL queries
+│       │   ├── snapshots.py     # S3 latest snapshot reads
 │       │   └── parquet.py       # Parquet/DuckDB queries
 │       ├── models/
 │       │   ├── spot.py          # Pydantic models for spots

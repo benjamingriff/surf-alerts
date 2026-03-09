@@ -19,6 +19,7 @@
 ## Data Architecture
 
 * [Data Layer Overview](data_architecture/README.md)
+* [Storage Layout](data_architecture/storage-layout.md)
 * [Forecast Schema](data_architecture/forecast-schema.md)
 * [Forecast Transformations](data_architecture/forecast-transformations.md)
 * [Forecast Queries](data_architecture/forecast-queries.md)

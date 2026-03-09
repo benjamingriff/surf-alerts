@@ -6,6 +6,8 @@ Parses the Surfline XML sitemap to discover all surf spots and their IDs. EventB
 
 **Package:** `packages/scrapers/sitemap_scraper/`
 
+> **Storage note:** The raw-layer path below describes the target storage contract after the layered storage rework.
+
 ## Endpoint Scraped
 
 ```
@@ -18,7 +20,7 @@ GET https://www.surfline.com/sitemaps/spots.xml
 2. Fetches the XML sitemap from `www.surfline.com`
 3. Parses XML with `lxml`
 4. Extracts spot IDs from URLs using regex: `surfline.com/surf-report/[name]/([spot_id])(/forecast)?`
-5. Writes results to S3
+5. Writes raw sitemap results to S3
 
 ## URL Pattern
 
@@ -35,9 +37,15 @@ The sitemap contains two URL types per spot:
 
 Both are captured — the main report URL and the forecast URL.
 
-## Output Format
+## Raw Output Format
 
-Written to `spots/{date}/sitemap.json.gz`:
+Written to:
+
+```text
+raw/sitemap/scrape_date=YYYY-MM-DD/run_id=<run_id>.json.gz
+```
+
+Payload shape:
 
 ```json
 {
@@ -61,4 +69,6 @@ Written to `spots/{date}/sitemap.json.gz`:
 | Timeout | 60s |
 | Status | Disabled |
 
-See [Surfline Taxonomy & Search](../surfline/taxonomy-and-search.md) for the sitemap API details.
+The sitemap output is later reconciled with taxonomy data into `processed/discovery/...`.
+
+See [Surfline Taxonomy & Search](../surfline/taxonomy-and-search.md) for the sitemap API details and [Storage Layout](../data_architecture/storage-layout.md) for the target bucket structure.

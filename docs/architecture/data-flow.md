@@ -1,8 +1,11 @@
 # Data Flow
 
-> **Status: IMPLEMENTED** (scrape + store) | **PLANNED** (Parquet + API)
+> **Status: IMPLEMENTED** (scrape + store) | **PLANNED** (layered storage + event-driven processing)
 
-## Current Pipeline (Implemented)
+## Storage Boundary (Current Implementation And Planned Target)
+
+The current implementation still writes gzip JSON to flat S3 keys via `{prefix}.gz`.
+The diagram below shows the **target storage boundary** after the layered storage rework, where scraper writes land in `raw/` and downstream processors publish `processed/` and `control/` objects.
 
 ```
 Surfline API
@@ -21,9 +24,18 @@ Surfline API
         │
         ▼
 ┌────────────────┐
-│  S3 Bucket     │     Gzip-compressed JSON
-│  {stack}-data  │     Path: {prefix}.gz
-└────────────────┘
+│  S3 Bucket     │     Raw write:
+│  {stack}-data  │     raw/{source_type}/...
+└───────┬────────┘
+        │
+        ▼
+┌────────────────┐     EventBridge / manifest-driven trigger
+│  Processor     │──── Transform raw payloads into canonical data
+│  (planned)     │
+└───────┬────────┘
+        │
+        ├──▶ processed/...      Canonical operational snapshots
+        └──▶ control/...        Manifests, checkpoints, completion records
 ```
 
 ### Forecast Scraper Flow
@@ -36,8 +48,13 @@ Surfline API
    - `/kbyg/spots/forecasts/wave` (5 days, hourly)
    - `/kbyg/spots/forecasts/weather` (16 days, hourly)
    - `/kbyg/spots/forecasts/wind` (5 days, hourly)
-3. Responses combined into single JSON with `metadata.json` + `data.json`
-4. Gzip-compressed and written to S3
+3. Responses combined into one raw forecast envelope
+4. Gzip-compressed and written to `raw/forecast/...`
+
+**Planned downstream outputs:**
+- `processed/forecast/canonical/...` - immutable per-scrape normalized object
+- `processed/forecast/latest/...` - mutable latest snapshot per spot
+- `processed/forecast/analytics/...` - analytical Parquet tables
 
 **Units requested:** `swellHeight=FT`, `waveHeight=FT`, `windSpeed=MPH`, `temperature=C`, `tideHeight=M`
 
@@ -47,44 +64,48 @@ Surfline API
 
 1. SQS message arrives with `spot_id`, `bucket`, `prefix`
 2. Lambda makes 1 HTTP request to `/kbyg/spots/reports?spotId={spot_id}`
-3. Response parsed and restructured (flattens travel details, cameras, breadcrumbs)
-4. Gzip-compressed and written to S3
+3. Response written to `raw/spot_report/...`
+4. A downstream processor flattens it into canonical discovery data
+
+**Planned downstream outputs:**
+- `processed/discovery/spots/spot_id=<id>/latest.json.gz` - canonical spot record
+- `processed/discovery/latest/catalog.json.gz` - latest full catalog
 
 ### Scheduled Scraper Flow (Currently Disabled)
 
 ```
 EventBridge Cron
      │
-     ├── 06:00 UTC ──▶ Sitemap Scraper ──▶ spots/{date}/sitemap.json.gz
+     ├── 06:00 UTC ──▶ Sitemap Scraper ──▶ raw/sitemap/...
      │
-     ├── 06:00 UTC ──▶ Taxonomy Scraper ──▶ taxonomy/{date}/taxonomy.json.gz
+     ├── 06:00 UTC ──▶ Taxonomy Scraper ──▶ raw/taxonomy/...
      │                  (recursive, 500ms delay between requests)
      │
-     └── 06:15 UTC ──▶ Spot Reconciler
-                        ├── Reads: sitemap + taxonomy + previous state
+     └── 06:15 UTC ──▶ Spot Reconciler / Discovery Processor
+                        ├── Reads: raw sitemap + raw taxonomy + previous latest state
                         ├── Merges and detects changes (SHA256 checksums)
-                        └── Writes: spots_data.json.gz, changes.json.gz, state.json.gz
+                        └── Writes: processed/discovery/snapshots/, changes/, latest/
 ```
 
 ## Planned Pipeline (Not Yet Implemented)
 
 ```
-S3 (Raw JSON)
+S3 raw layer
      │
-     ├──▶ ETL Job ──▶ Parquet (historical archive)
-     │                 Partitioned: year/month/spot_id
-     │                 7 fact/dim tables
+     ├──▶ Processor ──▶ processed canonical layer
+     │                   - discovery snapshots and changes
+     │                   - per-spot latest forecast
      │
-     └──▶ ETL Job ──▶ PostgreSQL (current forecast)
-                       Latest scrape only
-                       Materialized view
-                       │
-                       ▼
-                  FastAPI + Lambda
-                  (REST API)
+     ├──▶ Processor ──▶ processed analytics layer
+     │                   - forecast Parquet archive
+     │                   - partitioned by year/month/spot_id
+     │
+     └──▶ Future API / query layer
+                         - current reads from processed latest snapshots
+                         - historical reads from Parquet
 ```
 
-See [Forecast Schema](../data_architecture/forecast-schema.md) for the Parquet table definitions and [API Design](../api/README.md) for the planned API.
+See [Storage Layout](../data_architecture/storage-layout.md) for the bucket layout, [Forecast Schema](../data_architecture/forecast-schema.md) for the Parquet table definitions, and [API Design](../api/README.md) for the planned API.
 
 ## Error Handling
 

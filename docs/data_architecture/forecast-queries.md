@@ -2,7 +2,7 @@
 
 > **Status: IMPLEMENTED** | Last verified: 2026-03-06
 
-Example SQL queries against the [Forecast Schema](forecast-schema.md). These work with DuckDB, Athena, or any SQL engine reading the Parquet files.
+Example SQL queries against the [Forecast Schema](forecast-schema.md). These target the forecast analytical layer stored under `processed/forecast/analytics/` and work with DuckDB, Athena, or any SQL engine reading the Parquet files.
 
 ---
 

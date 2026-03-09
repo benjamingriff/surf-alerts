@@ -6,6 +6,8 @@ Scrapes spot metadata from the Surfline `/reports` endpoint. SQS-triggered Docke
 
 **Package:** `packages/scrapers/spot_scraper/`
 
+> **Storage note:** The current Lambda still flattens the response before writing to S3. The raw/processed split below describes the target storage contract after the layered storage rework.
+
 ## Endpoint Scraped
 
 ```
@@ -18,10 +20,20 @@ This is the richest spot endpoint — returns name, location, timezone, cameras,
 
 1. Receives SQS message with `spot_id`, `bucket`, `prefix`
 2. Makes 1 HTTP request to Surfline `/reports` endpoint
-3. Parses and restructures the response (flattens nested objects)
-4. Writes gzip-compressed JSON to S3
+3. Writes the raw `/reports` response to S3
+4. A downstream processor flattens the payload into canonical spot data
 
-## Output Format
+## Raw Output Format
+
+The scraper should write the unflattened Surfline `/reports` payload into the raw layer:
+
+```text
+raw/spot_report/spot_id=<spot_id>/scrape_date=YYYY-MM-DD/run_id=<run_id>.json.gz
+```
+
+## Processed Canonical Shape
+
+Downstream processing should publish a canonical spot record shaped like:
 
 ```json
 {
@@ -66,6 +78,12 @@ This is the richest spot endpoint — returns name, location, timezone, cameras,
 }
 ```
 
+Recommended processed key shape:
+
+```text
+processed/discovery/spots/spot_id=<spot_id>/latest.json.gz
+```
+
 ## Infrastructure
 
 | Setting | Value |
@@ -76,4 +94,4 @@ This is the richest spot endpoint — returns name, location, timezone, cameras,
 | SQS batch size | 1 |
 | DLQ max receives | 3 |
 
-See [Surfline Spot Endpoints](../surfline/spot-endpoints.md) for the raw API response schema.
+See [Surfline Spot Endpoints](../surfline/spot-endpoints.md) for the raw API response schema and [Storage Layout](../data_architecture/storage-layout.md) for the target bucket structure.

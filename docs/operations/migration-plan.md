@@ -38,9 +38,9 @@ s3://scraped-forecast-data/
       ...
 ```
 
-**Target structure (archive tier only):**
+**Target structure (forecast analytics layer only):**
 ```
-s3://surf-alerts-data/forecasts/archive/
+s3://surf-alerts-data/processed/forecast/analytics/archive/
   year=2024/month=01/
     fact_wave.parquet      # ALL spots for month, sorted by spot_id
     fact_rating.parquet
@@ -343,7 +343,7 @@ After migration completes:
 1. **Query with DuckDB** to verify data is readable:
    ```sql
    SELECT COUNT(*), MIN(forecast_ts), MAX(forecast_ts)
-   FROM read_parquet('s3://surf-alerts-data/forecasts/archive/year=2023/month=01/fact_wave.parquet');
+   FROM read_parquet('s3://surf-alerts-data/processed/forecast/analytics/archive/year=2023/month=01/fact_wave.parquet');
    ```
 
 2. **Spot-check** 5 random spot-days against original JSON
