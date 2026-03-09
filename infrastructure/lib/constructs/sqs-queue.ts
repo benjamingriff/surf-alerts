@@ -17,6 +17,7 @@ export class SqsQueue extends Construct {
     this.deadLetterQueue = new sqs.Queue(this, "QueueDLQ", {
       queueName: `${props.queueName}-dlq`,
       retentionPeriod: cdk.Duration.days(7),
+      visibilityTimeout: props.visibilityTimeout,
     });
 
     this.queue = new sqs.Queue(this, "Queue", {
