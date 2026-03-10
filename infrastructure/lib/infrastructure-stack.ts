@@ -183,6 +183,7 @@ export class InfrastructureStack extends cdk.Stack {
         batchSize: 1,
         enabled: true,
         reportBatchItemFailures: true,
+        maxConcurrency: 100,
       }),
     );
 
