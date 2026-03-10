@@ -97,21 +97,29 @@ def lambda_handler(event: dict, context: LambdaContext):
         logger.info("Processing manifest already exists", extra={"processing_manifest_key": processing_manifest_key})
         return {"statusCode": 200, "body": "duplicate completion event ignored"}
 
-    successes_by_spot_id, failures_by_spot_id = _load_terminal_markers(bucket, scrape_date, discovery_run_id)
-    terminal_count = len(successes_by_spot_id) + len(failures_by_spot_id)
-
     expected_count = manifest["added_spot_count"]
+
+    success_count = s3_client.count_keys(
+        bucket, _completion_prefix(SUCCESS_COMPLETION_PREFIX, scrape_date, discovery_run_id), suffix=".json.gz"
+    )
+    failed_count = s3_client.count_keys(
+        bucket, _completion_prefix(FAILED_COMPLETION_PREFIX, scrape_date, discovery_run_id), suffix=".json.gz"
+    )
+    terminal_count = success_count + failed_count
+
     if terminal_count < expected_count:
         logger.info(
             "Discovery run not complete yet",
             extra={
-                "successful_count": len(successes_by_spot_id),
-                "failed_count": len(failures_by_spot_id),
+                "successful_count": success_count,
+                "failed_count": failed_count,
                 "terminal_count": terminal_count,
                 "expected_count": expected_count,
             },
         )
         return {"statusCode": 200, "body": "waiting for remaining spot scrapes"}
+
+    successes_by_spot_id, failures_by_spot_id = _load_terminal_markers(bucket, scrape_date, discovery_run_id)
 
     ordered_spot_ids = [spot_id for spot_id in manifest["added_spot_ids"] if spot_id in successes_by_spot_id]
     raw_keys = [successes_by_spot_id[spot_id]["raw_key"] for spot_id in ordered_spot_ids]

@@ -88,8 +88,8 @@ export class InfrastructureStack extends cdk.Stack {
           "jobs",
           "discovery_completion",
         ),
-        timeout: 60,
-        memorySize: 512,
+        timeout: 120,
+        memorySize: 1024,
         environment: {
           DATA_BUCKET: dataBucket.bucketName,
         },

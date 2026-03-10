@@ -40,6 +40,15 @@ class S3Client:
                 return False
             raise
 
+    def count_keys(self, bucket: str, prefix: str, suffix: str = "") -> int:
+        paginator = self.s3.get_paginator("list_objects_v2")
+        count = 0
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for item in page.get("Contents", []):
+                if not suffix or item["Key"].endswith(suffix):
+                    count += 1
+        return count
+
     def list_keys(self, bucket: str, prefix: str) -> list[str]:
         paginator = self.s3.get_paginator("list_objects_v2")
         keys: list[str] = []
