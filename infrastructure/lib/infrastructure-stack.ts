@@ -23,21 +23,29 @@ export class InfrastructureStack extends cdk.Stack {
       eventBridgeEnabled: true,
     });
 
-    const sitemapScraper = new ScheduledScraper(this, "SitemapScraperConstruct", {
-      projectName,
-      scraperName: "sitemap-scraper",
-      codePath: path.join(
-        codebuildSrcDir,
-        "..",
-        "packages",
-        "scrapers",
-        "sitemap_scraper",
-      ),
-      timeout: 60,
-      memorySize: 1024,
-      schedule: events.Schedule.cron({ hour: "6", minute: "0", weekDay: "MON" }),
-      bucket: dataBucket,
-    });
+    const sitemapScraper = new ScheduledScraper(
+      this,
+      "SitemapScraperConstruct",
+      {
+        projectName,
+        scraperName: "sitemap-scraper",
+        codePath: path.join(
+          codebuildSrcDir,
+          "..",
+          "packages",
+          "scrapers",
+          "sitemap_scraper",
+        ),
+        timeout: 60,
+        memorySize: 1024,
+        schedule: events.Schedule.cron({
+          hour: "6",
+          minute: "0",
+          weekDay: "MON",
+        }),
+        bucket: dataBucket,
+      },
+    );
 
     const spotScraper = new ScraperWorker(this, "SpotScraperConstruct", {
       projectName,
@@ -88,7 +96,7 @@ export class InfrastructureStack extends cdk.Stack {
           "jobs",
           "discovery_completion",
         ),
-        timeout: 120,
+        timeout: 180,
         memorySize: 1024,
         environment: {
           DATA_BUCKET: dataBucket.bucketName,
@@ -167,7 +175,9 @@ export class InfrastructureStack extends cdk.Stack {
     dataBucket.grantReadWrite(discoverySpotHistoryProcessor.lambdaFunction);
     dataBucket.grantReadWrite(discoveryCatalogBuilder.lambdaFunction);
     spotScraper.queue.grantSendMessages(discoveryDiff.lambdaFunction);
-    spotScraper.deadLetterQueue.grantConsumeMessages(discoveryFailureFinalizer.lambdaFunction);
+    spotScraper.deadLetterQueue.grantConsumeMessages(
+      discoveryFailureFinalizer.lambdaFunction,
+    );
     discoveryFailureFinalizer.lambdaFunction.addEventSource(
       new lambdaEventSources.SqsEventSource(spotScraper.deadLetterQueue, {
         batchSize: 1,
@@ -212,11 +222,20 @@ export class InfrastructureStack extends cdk.Stack {
         detail: {
           bucket: { name: [dataBucket.bucketName] },
           object: {
-            key: [{ prefix: "control/manifests/processing/domain=discovery/stage=spot_history/" }],
+            key: [
+              {
+                prefix:
+                  "control/manifests/processing/domain=discovery/stage=spot_history/",
+              },
+            ],
           },
         },
       },
-      targets: [new targets.LambdaFunction(discoverySpotHistoryProcessor.lambdaFunction)],
+      targets: [
+        new targets.LambdaFunction(
+          discoverySpotHistoryProcessor.lambdaFunction,
+        ),
+      ],
     });
 
     new events.Rule(this, "DiscoveryCatalogBuilderRule", {
@@ -226,11 +245,18 @@ export class InfrastructureStack extends cdk.Stack {
         detail: {
           bucket: { name: [dataBucket.bucketName] },
           object: {
-            key: [{ prefix: "control/manifests/processing/domain=discovery/stage=catalog_build/" }],
+            key: [
+              {
+                prefix:
+                  "control/manifests/processing/domain=discovery/stage=catalog_build/",
+              },
+            ],
           },
         },
       },
-      targets: [new targets.LambdaFunction(discoveryCatalogBuilder.lambdaFunction)],
+      targets: [
+        new targets.LambdaFunction(discoveryCatalogBuilder.lambdaFunction),
+      ],
     });
   }
 }
