@@ -32,10 +32,11 @@ def _resolve_output(message_body: dict, spot_id: str, scraped_at: datetime, run_
     return bucket, build_spot_report_key(spot_id=spot_id, scraped_at=scraped_at, run_id=run_id)
 
 
-def _completion_key(scrape_date: str, discovery_run_id: str, spot_id: str) -> str:
+def _completion_key(scrape_date: str, discovery_run_id: str, spot_id: str, raw_run_id: str) -> str:
     return (
         "control/completions/discovery_spot_scrapes/"
-        f"date={scrape_date}/discovery_run_id={discovery_run_id}/spot_id={spot_id}.json.gz"
+        f"date={scrape_date}/discovery_run_id={discovery_run_id}/"
+        f"spot_id={spot_id}/raw_run_id={raw_run_id}.json.gz"
     )
 
 
@@ -78,6 +79,7 @@ def lambda_handler(event: dict, context: LambdaContext):
                     scrape_date=scraped_at_dt.strftime("%Y-%m-%d"),
                     discovery_run_id=discovery_run_id,
                     spot_id=spot_id,
+                    raw_run_id=run_id,
                 ),
                 body={
                     "schema_version": SCHEMA_VERSION,

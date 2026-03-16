@@ -43,6 +43,14 @@ def test_spot_scraper_writes_raw_report_and_completion_marker(s3, monkeypatch, l
     )["Contents"]
     assert len(raw_objects) == 1
     assert len(completion_objects) == 1
+    raw_key = raw_objects[0]["Key"]
+    raw_run_id = raw_key.split("/run_id=")[1].removesuffix(".json.gz")
+    assert (
+        completion_objects[0]["Key"]
+        == "control/completions/discovery_spot_scrapes/"
+        f"date={raw_key.split('/scrape_date=')[1][:10]}/discovery_run_id=run-1/"
+        f"spot_id=abc/raw_run_id={raw_run_id}.json.gz"
+    )
 
     completion_payload = json.loads(
         gzip.decompress(
