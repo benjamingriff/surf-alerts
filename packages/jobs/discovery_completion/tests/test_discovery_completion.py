@@ -1,6 +1,8 @@
 import gzip
 import json
 
+import pytest
+
 from discovery_completion import handler as handler_module
 from discovery_completion.handler import lambda_handler
 
@@ -168,7 +170,7 @@ def test_discovery_completion_emits_manifest_when_terminal_success_and_failure_c
     assert processing_manifest["failed_spot_count"] == 1
 
 
-def test_discovery_completion_reads_legacy_success_markers_for_backward_compatibility(s3, lambda_context):
+def test_discovery_completion_fails_on_legacy_success_marker_key(s3, lambda_context):
     bucket = "dataeng-squeegee-test-bucket"
     manifest_key = "control/manifests/discovery_runs/date=2026-03-09/discovery_run_id=run-legacy/manifest.json.gz"
     _write_json(
@@ -197,24 +199,17 @@ def test_discovery_completion_reads_legacy_success_markers_for_backward_compatib
         {"spot_id": "legacy", "raw_key": "raw/spot_report/spot_id=legacy/legacy.json.gz"},
     )
 
-    response = lambda_handler(
-        _event(
-            bucket,
-            "control/completions/discovery_spot_scrapes/date=2026-03-09/discovery_run_id=run-legacy/spot_id=legacy.json.gz",
-        ),
-        lambda_context,
-    )
+    with pytest.raises(ValueError, match="Unsupported legacy discovery success marker key"):
+        lambda_handler(
+            _event(
+                bucket,
+                "control/completions/discovery_spot_scrapes/date=2026-03-09/discovery_run_id=run-legacy/spot_id=legacy.json.gz",
+            ),
+            lambda_context,
+        )
 
-    assert response["statusCode"] == 200
-    processing_manifest = json.loads(
-        gzip.decompress(
-            s3.get_object(
-                Bucket=bucket,
-                Key=(
-                    "control/manifests/processing/domain=discovery/stage=spot_history/"
-                    "date=2026-03-09/discovery_run_id=run-legacy.json.gz"
-                ),
-            )["Body"].read()
-        ).decode("utf-8")
+    objects = s3.list_objects_v2(
+        Bucket=bucket,
+        Prefix="control/manifests/processing/domain=discovery/stage=spot_history/date=2026-03-09/",
     )
-    assert processing_manifest["raw_keys"] == ["raw/spot_report/spot_id=legacy/legacy.json.gz"]
+    assert "Contents" not in objects

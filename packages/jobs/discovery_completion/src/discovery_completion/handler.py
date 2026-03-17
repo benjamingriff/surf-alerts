@@ -21,10 +21,6 @@ SUCCESS_COMPLETION_KEY_PATTERN = re.compile(
     r"discovery_run_id=(?P<discovery_run_id>[^/]+)/spot_id=(?P<spot_id>[^/]+)/"
     r"raw_run_id=(?P<raw_run_id>[^/]+)\.json\.gz$"
 )
-LEGACY_SUCCESS_COMPLETION_KEY_PATTERN = re.compile(
-    r"control/completions/discovery_spot_scrapes/date=(?P<scrape_date>\d{4}-\d{2}-\d{2})/"
-    r"discovery_run_id=(?P<discovery_run_id>[^/]+)/spot_id=(?P<spot_id>[^/]+)\.json\.gz$"
-)
 FAILED_COMPLETION_KEY_PATTERN = re.compile(
     r"control/completions/discovery_spot_scrapes_failed/date=(?P<scrape_date>\d{4}-\d{2}-\d{2})/"
     r"discovery_run_id=(?P<discovery_run_id>[^/]+)/spot_id=(?P<spot_id>[^/]+)\.json\.gz$"
@@ -67,29 +63,24 @@ def _raw_report_key(scrape_date: str, spot_id: str, raw_run_id: str) -> str:
     return f"raw/spot_report/spot_id={spot_id}/scrape_date={scrape_date}/run_id={raw_run_id}.json.gz"
 
 
-def _scan_success_markers(bucket: str, scrape_date: str, discovery_run_id: str) -> tuple[int, dict[str, str], list[str]]:
+def _scan_success_markers(bucket: str, scrape_date: str, discovery_run_id: str) -> tuple[int, dict[str, str]]:
     success_count = 0
     raw_keys_by_spot_id: dict[str, str] = {}
-    legacy_success_keys: list[str] = []
     prefix = _completion_prefix(SUCCESS_COMPLETION_PREFIX, scrape_date, discovery_run_id)
 
     for key in s3_client.list_keys(bucket, prefix):
         match = SUCCESS_COMPLETION_KEY_PATTERN.search(key)
-        if match:
-            success_count += 1
-            raw_keys_by_spot_id[match.group("spot_id")] = _raw_report_key(
-                scrape_date=scrape_date,
-                spot_id=match.group("spot_id"),
-                raw_run_id=match.group("raw_run_id"),
-            )
-            continue
+        if not match:
+            raise ValueError(f"Unsupported legacy discovery success marker key: {key}")
 
-        legacy_match = LEGACY_SUCCESS_COMPLETION_KEY_PATTERN.search(key)
-        if legacy_match:
-            success_count += 1
-            legacy_success_keys.append(key)
+        success_count += 1
+        raw_keys_by_spot_id[match.group("spot_id")] = _raw_report_key(
+            scrape_date=scrape_date,
+            spot_id=match.group("spot_id"),
+            raw_run_id=match.group("raw_run_id"),
+        )
 
-    return success_count, raw_keys_by_spot_id, legacy_success_keys
+    return success_count, raw_keys_by_spot_id
 
 
 def _scan_failure_markers(bucket: str, scrape_date: str, discovery_run_id: str) -> tuple[int, list[str]]:
@@ -101,15 +92,6 @@ def _scan_failure_markers(bucket: str, scrape_date: str, discovery_run_id: str) 
             failed_keys.append(key)
 
     return len(failed_keys), failed_keys
-
-
-def _load_legacy_success_markers(bucket: str, keys: list[str]) -> dict[str, str]:
-    raw_keys_by_spot_id: dict[str, str] = {}
-    for key in keys:
-        payload = s3_client.get_json(bucket, key)
-        if payload and payload.get("spot_id") and payload.get("raw_key"):
-            raw_keys_by_spot_id[payload["spot_id"]] = payload["raw_key"]
-    return raw_keys_by_spot_id
 
 
 def _load_failure_markers(bucket: str, keys: list[str]) -> dict[str, dict]:
@@ -149,7 +131,7 @@ def lambda_handler(event: dict, context: LambdaContext):
     expected_count = manifest["added_spot_count"]
 
     success_scan_start = time.perf_counter()
-    success_count, raw_keys_by_spot_id, legacy_success_keys = _scan_success_markers(
+    success_count, raw_keys_by_spot_id = _scan_success_markers(
         bucket,
         scrape_date,
         discovery_run_id,
@@ -169,7 +151,6 @@ def lambda_handler(event: dict, context: LambdaContext):
         "failed_count": failed_count,
         "terminal_count": terminal_count,
         "expected_count": expected_count,
-        "legacy_success_marker_count": len(legacy_success_keys),
         "failed_marker_count": len(failed_keys),
         "handler_elapsed_ms": round((time.perf_counter() - handler_start) * 1000, 2),
     }
@@ -177,10 +158,6 @@ def lambda_handler(event: dict, context: LambdaContext):
     if terminal_count < expected_count:
         logger.info("Discovery run not complete yet", extra=scan_metrics)
         return {"statusCode": 200, "body": "waiting for remaining spot scrapes"}
-
-    legacy_load_start = time.perf_counter()
-    raw_keys_by_spot_id.update(_load_legacy_success_markers(bucket, legacy_success_keys))
-    legacy_success_load_ms = round((time.perf_counter() - legacy_load_start) * 1000, 2)
 
     failure_load_start = time.perf_counter()
     failures_by_spot_id = _load_failure_markers(bucket, failed_keys)
@@ -223,7 +200,6 @@ def lambda_handler(event: dict, context: LambdaContext):
         "Discovery spot history manifest emitted",
         extra={
             **scan_metrics,
-            "legacy_success_load_ms": legacy_success_load_ms,
             "failure_load_ms": failure_load_ms,
             "manifest_write_ms": round((time.perf_counter() - manifest_write_start) * 1000, 2),
             "handler_elapsed_ms": round((time.perf_counter() - handler_start) * 1000, 2),
