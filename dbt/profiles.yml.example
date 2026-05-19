@@ -1,0 +1,12 @@
+surf_alerts:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: your-project.supabase.co
+      user: postgres
+      password: env_var('SUPABASE_DB_PASSWORD')
+      port: 5432
+      dbname: postgres
+      schema: public
+      threads: 4

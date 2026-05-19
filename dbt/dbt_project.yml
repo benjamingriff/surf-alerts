@@ -1,0 +1,9 @@
+name: surf_alerts
+version: '1.0'
+config-version: 2
+profile: surf_alerts
+model-paths: [models]
+models:
+  surf_alerts:
+    discovery:
+      +materialized: view

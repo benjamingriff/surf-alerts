@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: public
+    tables:
+      - name: discovery_spot_versions
+
+models:
+  - name: current_spots
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [spot_id]
