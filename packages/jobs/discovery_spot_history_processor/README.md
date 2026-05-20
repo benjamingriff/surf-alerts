@@ -1,1 +1,0 @@
-# Discovery Spot History Processor
