@@ -17,6 +17,8 @@ RUN --mount=from=uv,source=/uv,target=/bin/uv \
 FROM public.ecr.aws/lambda/python:3.12
 
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
+COPY --from=builder /build/packages/libs/discovery_control/src/discovery_control ${LAMBDA_TASK_ROOT}/discovery_control
+COPY --from=builder /build/packages/libs/postgres_client/src/postgres_client ${LAMBDA_TASK_ROOT}/postgres_client
 
 ENV PYTHONPATH="${LAMBDA_TASK_ROOT}"
 
