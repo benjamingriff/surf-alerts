@@ -22,7 +22,7 @@ def _messages(queue_url: str) -> list[dict]:
 
 def test_records_success_and_failure_then_queues_batch_processor_once(monkeypatch, lambda_context):
     sqs = boto3.client("sqs", region_name="eu-west-2")
-    queue_url = sqs.create_queue(QueueName="completion-batch") ["QueueUrl"]
+    queue_url = sqs.create_queue(QueueName="completion-batch")["QueueUrl"]
     monkeypatch.setenv("DISCOVERY_SPOT_BATCH_PROCESSOR_QUEUE_URL", queue_url)
     monkeypatch.setattr("discovery_completion.handler._utc_now_iso", lambda: "2026-05-01T06:10:00Z")
     store = _control_store()
@@ -37,8 +37,30 @@ def test_records_success_and_failure_then_queues_batch_processor_once(monkeypatc
     response = lambda_handler(
         {
             "Records": [
-                {"body": json.dumps({"discovery_run_id": "run-1", "spot_id": "a", "terminal_status": "success", "raw_bucket": "bucket", "raw_key": "raw/a.json.gz", "completed_at": "2026-05-01T06:02:00Z"})},
-                {"body": json.dumps({"discovery_run_id": "run-1", "spot_id": "b", "terminal_status": "failed", "failure_reason": "HTTP 403", "failure_source": "spot_scraper", "failed_at": "2026-05-01T06:03:00Z"})},
+                {
+                    "body": json.dumps(
+                        {
+                            "discovery_run_id": "run-1",
+                            "spot_id": "a",
+                            "terminal_status": "success",
+                            "raw_bucket": "bucket",
+                            "raw_key": "raw/a.json.gz",
+                            "completed_at": "2026-05-01T06:02:00Z",
+                        }
+                    )
+                },
+                {
+                    "body": json.dumps(
+                        {
+                            "discovery_run_id": "run-1",
+                            "spot_id": "b",
+                            "terminal_status": "failed",
+                            "failure_reason": "HTTP 403",
+                            "failure_source": "spot_scraper",
+                            "failed_at": "2026-05-01T06:03:00Z",
+                        }
+                    )
+                },
             ]
         },
         lambda_context,
@@ -66,9 +88,11 @@ def test_records_success_and_failure_then_queues_batch_processor_once(monkeypatc
     ]
 
 
-def test_duplicate_completion_is_deduplicated_and_does_not_increment_or_queue(monkeypatch, lambda_context):
+def test_duplicate_completion_is_deduplicated_and_does_not_increment_or_queue(
+    monkeypatch, lambda_context
+):
     sqs = boto3.client("sqs", region_name="eu-west-2")
-    queue_url = sqs.create_queue(QueueName="completion-dedupe") ["QueueUrl"]
+    queue_url = sqs.create_queue(QueueName="completion-dedupe")["QueueUrl"]
     monkeypatch.setenv("DISCOVERY_SPOT_BATCH_PROCESSOR_QUEUE_URL", queue_url)
     store = _control_store()
     store.seed_run(
@@ -80,8 +104,30 @@ def test_duplicate_completion_is_deduplicated_and_does_not_increment_or_queue(mo
     store.seed_spots(discovery_run_id="run-dup", spot_ids=["a"])
     event = {
         "Records": [
-            {"body": json.dumps({"discovery_run_id": "run-dup", "spot_id": "a", "terminal_status": "success", "raw_bucket": "bucket", "raw_key": "raw/a.json.gz", "completed_at": "2026-05-01T06:02:00Z"})},
-            {"body": json.dumps({"discovery_run_id": "run-dup", "spot_id": "a", "terminal_status": "success", "raw_bucket": "bucket", "raw_key": "raw/a.json.gz", "completed_at": "2026-05-01T06:02:00Z"})},
+            {
+                "body": json.dumps(
+                    {
+                        "discovery_run_id": "run-dup",
+                        "spot_id": "a",
+                        "terminal_status": "success",
+                        "raw_bucket": "bucket",
+                        "raw_key": "raw/a.json.gz",
+                        "completed_at": "2026-05-01T06:02:00Z",
+                    }
+                )
+            },
+            {
+                "body": json.dumps(
+                    {
+                        "discovery_run_id": "run-dup",
+                        "spot_id": "a",
+                        "terminal_status": "success",
+                        "raw_bucket": "bucket",
+                        "raw_key": "raw/a.json.gz",
+                        "completed_at": "2026-05-01T06:02:00Z",
+                    }
+                )
+            },
         ]
     }
 
@@ -96,7 +142,7 @@ def test_duplicate_completion_is_deduplicated_and_does_not_increment_or_queue(mo
 
 def test_not_all_terminal_does_not_queue_batch_processor(monkeypatch, lambda_context):
     sqs = boto3.client("sqs", region_name="eu-west-2")
-    queue_url = sqs.create_queue(QueueName="completion-not-ready") ["QueueUrl"]
+    queue_url = sqs.create_queue(QueueName="completion-not-ready")["QueueUrl"]
     monkeypatch.setenv("DISCOVERY_SPOT_BATCH_PROCESSOR_QUEUE_URL", queue_url)
     store = _control_store()
     store.seed_run(
@@ -108,7 +154,22 @@ def test_not_all_terminal_does_not_queue_batch_processor(monkeypatch, lambda_con
     store.seed_spots(discovery_run_id="run-wait", spot_ids=["a", "b"])
 
     lambda_handler(
-        {"Records": [{"body": json.dumps({"discovery_run_id": "run-wait", "spot_id": "a", "terminal_status": "success", "raw_bucket": "bucket", "raw_key": "raw/a.json.gz", "completed_at": "2026-05-01T06:02:00Z"})}]},
+        {
+            "Records": [
+                {
+                    "body": json.dumps(
+                        {
+                            "discovery_run_id": "run-wait",
+                            "spot_id": "a",
+                            "terminal_status": "success",
+                            "raw_bucket": "bucket",
+                            "raw_key": "raw/a.json.gz",
+                            "completed_at": "2026-05-01T06:02:00Z",
+                        }
+                    )
+                }
+            ]
+        },
         lambda_context,
     )
 

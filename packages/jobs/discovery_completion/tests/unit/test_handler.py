@@ -53,7 +53,10 @@ def test_build_batch_processor_message_shape():
 def test_success_completion_records_terminal_fields_without_queueing(monkeypatch):
     sent = []
     store = FakeStore(run={"terminal_scrape_count": 1, "expected_spot_count": 2})
-    monkeypatch.setattr("discovery_completion.handler._send_batch_processor_request", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr(
+        "discovery_completion.handler._send_batch_processor_request",
+        lambda **kwargs: sent.append(kwargs),
+    )
 
     result = process_completion_message(_success_payload(), store=store)
 
@@ -77,7 +80,10 @@ def test_success_completion_records_terminal_fields_without_queueing(monkeypatch
 def test_duplicate_completion_does_not_fetch_run_or_queue(monkeypatch):
     sent = []
     store = FakeStore(mark_result=False)
-    monkeypatch.setattr("discovery_completion.handler._send_batch_processor_request", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr(
+        "discovery_completion.handler._send_batch_processor_request",
+        lambda **kwargs: sent.append(kwargs),
+    )
 
     result = process_completion_message(_success_payload(), store=store)
 
@@ -92,7 +98,10 @@ def test_last_terminal_completion_transitions_and_queues_once(monkeypatch):
         run={"terminal_scrape_count": 2, "expected_spot_count": 2},
         transitions=[True, True],
     )
-    monkeypatch.setattr("discovery_completion.handler._send_batch_processor_request", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr(
+        "discovery_completion.handler._send_batch_processor_request",
+        lambda **kwargs: sent.append(kwargs),
+    )
 
     result = process_completion_message(_success_payload(), store=store)
 
@@ -110,7 +119,10 @@ def test_loser_of_status_transition_does_not_queue(monkeypatch):
         run={"terminal_scrape_count": 2, "expected_spot_count": 2},
         transitions=[False],
     )
-    monkeypatch.setattr("discovery_completion.handler._send_batch_processor_request", lambda **kwargs: sent.append(kwargs))
+    monkeypatch.setattr(
+        "discovery_completion.handler._send_batch_processor_request",
+        lambda **kwargs: sent.append(kwargs),
+    )
 
     result = process_completion_message(_success_payload(), store=store)
 

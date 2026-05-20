@@ -59,7 +59,9 @@ def _send_batch_processor_request(*, discovery_run_id: str) -> None:
     )
 
 
-def process_completion_message(payload: dict[str, Any], *, store: ControlStore | None = None) -> str:
+def process_completion_message(
+    payload: dict[str, Any], *, store: ControlStore | None = None
+) -> str:
     store = store or _store()
     discovery_run_id = payload["discovery_run_id"]
     newly_terminal = store.mark_spot_terminal(
@@ -124,5 +126,7 @@ def lambda_handler(event: dict, context: LambdaContext):
     )
     return {
         "statusCode": 200,
-        "body": json.dumps({"processed": processed, "deduplicated": deduplicated, "queued": queued}),
+        "body": json.dumps(
+            {"processed": processed, "deduplicated": deduplicated, "queued": queued}
+        ),
     }
