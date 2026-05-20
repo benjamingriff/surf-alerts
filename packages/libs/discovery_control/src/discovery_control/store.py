@@ -130,9 +130,9 @@ class ControlStore:
     def seed_spots(self, *, discovery_run_id: str, spot_ids: list[str]) -> None:
         now = _isoformat()
         ttl = self._ttl()
-        for spot_id in spot_ids:
-            try:
-                self.table.put_item(
+        with self.table.batch_writer(overwrite_by_pkeys=["pk", "sk"]) as batch:
+            for spot_id in spot_ids:
+                batch.put_item(
                     Item={
                         **self.spot_key(discovery_run_id, spot_id),
                         "item_type": "planned_spot",
@@ -141,13 +141,8 @@ class ControlStore:
                         "created_at": now,
                         "updated_at": now,
                         "expires_at": ttl,
-                    },
-                    ConditionExpression="attribute_not_exists(pk)",
+                    }
                 )
-            except ClientError as error:
-                if error.response["Error"]["Code"] == "ConditionalCheckFailedException":
-                    continue
-                raise
 
     def get_run(self, discovery_run_id: str) -> dict[str, Any] | None:
         return self.table.get_item(Key=self.run_key(discovery_run_id)).get("Item")

@@ -21,21 +21,23 @@ class InMemoryCursor:
         return False
 
     def execute(self, sql, params=None):
-        if "spot_id = any" in sql:
+        if "spot_id = any" in sql and sql.startswith("select"):
             ids = set(params[0])
             self.result_all = [
                 r.copy()
                 for r in self.db
                 if r.get("is_current") is True
-                and r.get("event_type") != "removed"
                 and r["spot_id"] in ids
+                and ("event_type <> 'removed'" not in sql or r.get("event_type") != "removed")
             ]
         elif sql.startswith("update discovery_spot_versions set is_current=false"):
-            valid_to, spot_id = params
+            valid_to, spot_ids = params
+            ids = set(spot_ids if isinstance(spot_ids, list) else [spot_ids])
             for row in self.db:
-                if row["spot_id"] == spot_id and row.get("is_current") is True:
-                    row["is_current"] = False
-                    row["valid_to"] = valid_to
+                if row["spot_id"] in ids and row.get("is_current") is True:
+                    if "event_type='removed'" not in sql or row.get("event_type") == "removed":
+                        row["is_current"] = False
+                        row["valid_to"] = valid_to
         elif "where spot_id=%s" in sql:
             spot_id = params[0]
             matches = [
@@ -47,23 +49,28 @@ class InMemoryCursor:
             ]
             self.result_one = matches[0].copy() if matches else None
         elif sql.startswith("insert into discovery_spot_versions"):
-            cols = sql.split("(", 1)[1].split(")", 1)[0].split(",")
-            row = dict(zip(cols, params))
-            for col in [
-                "breadcrumbs",
-                "cameras",
-                "ability_levels",
-                "board_types",
-                "travel_details",
-            ]:
-                if isinstance(row.get(col), str):
-                    row[col] = json.loads(row[col])
-            if not any(
-                existing["spot_version_id"] == row["spot_version_id"] for existing in self.db
-            ):
-                self.db.append(row)
+            self._insert(sql, params)
         else:
             raise AssertionError(f"Unexpected SQL: {sql}")
+
+    def executemany(self, sql, params_seq):
+        for params in params_seq:
+            self._insert(sql, params)
+
+    def _insert(self, sql, params):
+        cols = sql.split("(", 1)[1].split(")", 1)[0].split(",")
+        row = dict(zip(cols, params))
+        for col in [
+            "breadcrumbs",
+            "cameras",
+            "ability_levels",
+            "board_types",
+            "travel_details",
+        ]:
+            if isinstance(row.get(col), str):
+                row[col] = json.loads(row[col])
+        if not any(existing["spot_version_id"] == row["spot_version_id"] for existing in self.db):
+            self.db.append(row)
 
     def fetchall(self):
         return self.result_all

@@ -56,7 +56,7 @@ export class InfrastructureStack extends cdk.Stack {
       "DiscoveryCompletionQueue",
       {
         queueName: `${projectName}-discovery-completion-queue`,
-        visibilityTimeout: cdk.Duration.seconds(180),
+        visibilityTimeout: cdk.Duration.seconds(180 * 6),
       },
     );
 
@@ -65,7 +65,7 @@ export class InfrastructureStack extends cdk.Stack {
       "DiscoveryRunPlannerQueue",
       {
         queueName: `${projectName}-discovery-run-planner-queue`,
-        visibilityTimeout: cdk.Duration.seconds(180),
+        visibilityTimeout: cdk.Duration.seconds(300 * 6),
       },
     );
 
@@ -74,7 +74,7 @@ export class InfrastructureStack extends cdk.Stack {
       "DiscoverySpotBatchProcessorQueue",
       {
         queueName: `${projectName}-discovery-spot-batch-processor-queue`,
-        visibilityTimeout: cdk.Duration.seconds(900),
+        visibilityTimeout: cdk.Duration.seconds(900 * 6),
       },
     );
 
@@ -142,7 +142,7 @@ export class InfrastructureStack extends cdk.Stack {
           "discovery_run_planner",
           "Dockerfile",
         ),
-        timeout: 180,
+        timeout: 300,
         memorySize: 1024,
         environment: {
           DATA_BUCKET: dataBucket.bucketName,
@@ -197,6 +197,7 @@ export class InfrastructureStack extends cdk.Stack {
         environment: {
           DATA_BUCKET: dataBucket.bucketName,
           DISCOVERY_CONTROL_TABLE_NAME: discoveryControlTable.tableName,
+          DISCOVERY_SPOT_BATCH_S3_READ_WORKERS: "16",
           SUPABASE_POSTGRES_URL_PARAMETER_NAME:
             "/surf-alerts/supabase/postgres-url",
         },

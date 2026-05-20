@@ -26,7 +26,9 @@ export class ScraperWorker extends Construct {
 
     const sqsConstruct = new SqsQueue(this, "ScraperQueue", {
       queueName: `${props.projectName}-${props.scraperName}-queue`,
-      visibilityTimeout: cdk.Duration.seconds(props.timeout * 3),
+      // AWS recommends SQS visibility timeout is at least 6x the Lambda timeout
+      // for Lambda event source mappings, allowing time for throttling/retries.
+      visibilityTimeout: cdk.Duration.seconds(props.timeout * 6),
     });
 
     this.queue = sqsConstruct.queue;

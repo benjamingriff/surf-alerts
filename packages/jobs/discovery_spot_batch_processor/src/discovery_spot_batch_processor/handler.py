@@ -1,6 +1,7 @@
 import gzip
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 
@@ -48,6 +49,7 @@ COLUMNS = [
     "schema_version",
 ]
 JSON_COLUMNS = {"breadcrumbs", "cameras", "ability_levels", "board_types", "travel_details"}
+DEFAULT_S3_READ_WORKERS = 16
 
 
 def _s3_client():
@@ -60,6 +62,10 @@ def _store() -> ControlStore:
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _s3_read_workers() -> int:
+    return int(os.environ.get("DISCOVERY_SPOT_BATCH_S3_READ_WORKERS", DEFAULT_S3_READ_WORKERS))
 
 
 def _get_json(bucket: str, key: str) -> dict[str, Any]:
@@ -79,29 +85,120 @@ def serialize_row_values(row: dict[str, Any]) -> list[Any]:
     return values
 
 
-def _insert_row(cur, row: dict[str, Any]) -> None:
-    cur.execute(
-        f"insert into discovery_spot_versions ({','.join(COLUMNS)}) values ({','.join(['%s'] * len(COLUMNS))}) on conflict (spot_version_id) do nothing",
-        serialize_row_values(row),
+def _chunks(items: list[Any], size: int):
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
+
+
+def _insert_rows(cur, rows: list[dict[str, Any]], batch_size: int = 1000) -> None:
+    if not rows:
+        return
+
+    sql = f"insert into discovery_spot_versions ({','.join(COLUMNS)}) values ({','.join(['%s'] * len(COLUMNS))}) on conflict (spot_version_id) do nothing"
+    for chunk in _chunks(rows, batch_size):
+        cur.executemany(sql, [serialize_row_values(row) for row in chunk])
+
+
+def build_added_row(
+    *, bucket: str, run_id: str, item: dict[str, Any], valid_from: str
+) -> dict[str, Any]:
+    raw = _get_json(item.get("raw_bucket") or bucket, item["raw_key"])
+    canonical = canonicalize_spot_report(raw, item["spot_id"])
+    return build_added_spot_version_row(
+        canonical_spot=canonical,
+        discovery_run_id=run_id,
+        source_raw_key=item["raw_key"],
+        valid_from=valid_from,
     )
 
 
 def build_added_rows(
-    *, bucket: str, run_id: str, success_items: list[dict[str, Any]], valid_from: str
+    *,
+    bucket: str,
+    run_id: str,
+    success_items: list[dict[str, Any]],
+    valid_from: str,
+    max_workers: int | None = None,
 ) -> list[dict[str, Any]]:
-    rows = []
-    for item in success_items:
-        raw = _get_json(item.get("raw_bucket") or bucket, item["raw_key"])
-        canonical = canonicalize_spot_report(raw, item["spot_id"])
-        rows.append(
-            build_added_spot_version_row(
-                canonical_spot=canonical,
-                discovery_run_id=run_id,
-                source_raw_key=item["raw_key"],
-                valid_from=valid_from,
+    if not success_items:
+        return []
+
+    workers = max_workers or _s3_read_workers()
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        return list(
+            executor.map(
+                lambda item: build_added_row(
+                    bucket=bucket,
+                    run_id=run_id,
+                    item=item,
+                    valid_from=valid_from,
+                ),
+                success_items,
             )
         )
-    return rows
+
+
+def _fetch_current_removed_rows(cur, spot_ids: list[str]) -> dict[str, dict[str, Any]]:
+    if not spot_ids:
+        return {}
+    cur.execute(
+        "select * from discovery_spot_versions where is_current = true and event_type <> 'removed' and spot_id = any(%s)",
+        (spot_ids,),
+    )
+    return {row["spot_id"]: row for row in cur.fetchall()}
+
+
+def _fetch_current_added_rows(cur, spot_ids: list[str]) -> dict[str, dict[str, Any]]:
+    if not spot_ids:
+        return {}
+    cur.execute(
+        "select spot_id, spot_version_id, content_checksum, event_type from discovery_spot_versions where is_current = true and spot_id = any(%s)",
+        (spot_ids,),
+    )
+    return {row["spot_id"]: row for row in cur.fetchall()}
+
+
+def _plan_added_rows(
+    *, added_rows: list[dict[str, Any]], current_by_spot: dict[str, dict[str, Any]]
+) -> tuple[list[dict[str, Any]], list[str]]:
+    rows_to_insert = []
+    readded_spot_ids = []
+    conflicts = []
+
+    for row in added_rows:
+        current = current_by_spot.get(row["spot_id"])
+        if not current:
+            rows_to_insert.append(row)
+        elif current.get("event_type") == "removed":
+            readded_spot_ids.append(row["spot_id"])
+            rows_to_insert.append(row)
+        elif current["spot_version_id"] != row["spot_version_id"]:
+            conflicts.append(row["spot_id"])
+
+    if len(conflicts) == 1:
+        raise RuntimeError(f"Current active spot conflict for {conflicts[0]}")
+    if conflicts:
+        raise RuntimeError(f"Current active spot conflicts: {conflicts[:20]}")
+
+    return rows_to_insert, readded_spot_ids
+
+
+def _close_current_rows(cur, *, valid_from: str, spot_ids: list[str]) -> None:
+    if not spot_ids:
+        return
+    cur.execute(
+        "update discovery_spot_versions set is_current=false, valid_to=%s where spot_id = any(%s) and is_current=true",
+        (valid_from, spot_ids),
+    )
+
+
+def _close_current_removed_tombstones(cur, *, valid_from: str, spot_ids: list[str]) -> None:
+    if not spot_ids:
+        return
+    cur.execute(
+        "update discovery_spot_versions set is_current=false, valid_to=%s where spot_id = any(%s) and is_current=true and event_type='removed'",
+        (valid_from, spot_ids),
+    )
 
 
 def apply_spot_version_changes(
@@ -112,45 +209,32 @@ def apply_spot_version_changes(
     added_rows: list[dict[str, Any]],
     valid_from: str,
 ) -> None:
+    removed_spot_ids = manifest["removed_spot_ids"]
+    added_spot_ids = [row["spot_id"] for row in added_rows]
+
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute(
-                "select * from discovery_spot_versions where is_current = true and event_type <> 'removed' and spot_id = any(%s)",
-                (manifest["removed_spot_ids"],),
+            current_removed = _fetch_current_removed_rows(cur, removed_spot_ids)
+            current_added = _fetch_current_added_rows(cur, added_spot_ids)
+            rows_to_insert, readded_spot_ids = _plan_added_rows(
+                added_rows=added_rows, current_by_spot=current_added
             )
-            current_removed = {row["spot_id"]: row for row in cur.fetchall()}
-            for spot_id, current in current_removed.items():
-                tombstone = build_removed_tombstone_row(
+            tombstone_rows = [
+                build_removed_tombstone_row(
                     current_row=current,
                     discovery_run_id=run_id,
                     source_raw_key=manifest["sitemap_raw_key"],
                     valid_from=valid_from,
                 )
-                cur.execute(
-                    "update discovery_spot_versions set is_current=false, valid_to=%s where spot_id=%s and is_current=true",
-                    (valid_from, spot_id),
-                )
-                _insert_row(cur, tombstone)
+                for current in current_removed.values()
+            ]
 
-            for row in added_rows:
-                cur.execute(
-                    "select spot_version_id, content_checksum, event_type from discovery_spot_versions where spot_id=%s and is_current=true",
-                    (row["spot_id"],),
-                )
-                existing = cur.fetchone()
-
-                if existing:
-                    if existing.get("event_type") != "removed":
-                        if existing["spot_version_id"] == row["spot_version_id"]:
-                            continue
-                        raise RuntimeError(f"Current active spot conflict for {row['spot_id']}")
-
-                    cur.execute(
-                        "update discovery_spot_versions set is_current=false, valid_to=%s where spot_id=%s and is_current=true",
-                        (valid_from, row["spot_id"]),
-                    )
-
-                _insert_row(cur, row)
+            _close_current_rows(cur, valid_from=valid_from, spot_ids=list(current_removed))
+            _close_current_removed_tombstones(
+                cur, valid_from=valid_from, spot_ids=readded_spot_ids
+            )
+            _insert_rows(cur, tombstone_rows)
+            _insert_rows(cur, rows_to_insert)
 
 
 def should_process_run(run_id: str, store: ControlStore) -> str:

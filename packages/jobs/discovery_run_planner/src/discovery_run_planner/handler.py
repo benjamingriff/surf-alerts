@@ -87,6 +87,11 @@ def _current_active_ids() -> set[str]:
             return {r["spot_id"] for r in cur.fetchall()}
 
 
+def _chunks(items: list[str], size: int):
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
+
+
 def _queue_spot_scrapes(
     *,
     queue_url: str,
@@ -96,21 +101,30 @@ def _queue_spot_scrapes(
     spot_ids: list[str],
     requested_at: str,
 ) -> None:
-    for spot_id in spot_ids:
-        _sqs().send_message(
+    sqs = _sqs()
+    for chunk in _chunks(spot_ids, 10):
+        response = sqs.send_message_batch(
             QueueUrl=queue_url,
-            MessageBody=json.dumps(
+            Entries=[
                 {
-                    "schema_version": SCHEMA_VERSION,
-                    "message_type": "spot_scrape_requested",
-                    "discovery_run_id": discovery_run_id,
-                    "scrape_date": scrape_date,
-                    "spot_id": spot_id,
-                    "sitemap_raw_key": raw_key,
-                    "requested_at": requested_at,
+                    "Id": str(index),
+                    "MessageBody": json.dumps(
+                        {
+                            "schema_version": SCHEMA_VERSION,
+                            "message_type": "spot_scrape_requested",
+                            "discovery_run_id": discovery_run_id,
+                            "scrape_date": scrape_date,
+                            "spot_id": spot_id,
+                            "sitemap_raw_key": raw_key,
+                            "requested_at": requested_at,
+                        }
+                    ),
                 }
-            ),
+                for index, spot_id in enumerate(chunk)
+            ],
         )
+        if response.get("Failed"):
+            raise RuntimeError(f"Failed to queue spot scrape messages: {response['Failed']}")
 
 
 def _queue_batch_processor(*, discovery_run_id: str, requested_at: str) -> None:

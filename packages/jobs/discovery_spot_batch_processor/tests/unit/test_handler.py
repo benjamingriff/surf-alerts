@@ -3,7 +3,9 @@ import pytest
 from discovery_spot_model import build_added_spot_version_row, canonicalize_spot_report
 from discovery_spot_batch_processor.handler import (
     COLUMNS,
+    _s3_read_workers,
     apply_spot_version_changes,
+    build_added_row,
     build_added_rows,
     lambda_handler,
     process_discovery_run,
@@ -66,13 +68,27 @@ class FakeCursor:
     def execute(self, sql, params=None):
         self.executed.append((sql, params))
         if "spot_id = any" in sql:
-            self._fetchall = self.removed_rows
+            ids = set(params[0])
+            if "event_type <> 'removed'" in sql:
+                self._fetchall = [
+                    row for row in self.removed_rows if row["spot_id"] in ids
+                ]
+            else:
+                self._fetchall = [
+                    {"spot_id": spot_id, **row}
+                    for spot_id, row in self.existing_by_spot.items()
+                    if spot_id in ids
+                ]
         elif "where spot_id=%s" in sql:
             row = self.existing_by_spot.get(params[0])
             if row and "event_type <> 'removed'" in sql and row.get("event_type") == "removed":
                 self._fetchone = None
             else:
                 self._fetchone = row
+
+    def executemany(self, sql, params_seq):
+        for params in params_seq:
+            self.executed.append((sql, params))
 
     def fetchall(self):
         return self._fetchall
@@ -127,6 +143,31 @@ def test_serialize_row_values_json_encodes_json_columns():
     assert values[COLUMNS.index("travel_details")] == '{"a": 1}'
 
 
+def test_build_added_row_reads_raw_and_builds_version(monkeypatch):
+    reads = []
+    monkeypatch.setattr(
+        "discovery_spot_batch_processor.handler._get_json",
+        lambda bucket, key: reads.append((bucket, key)) or {"raw_payload": {"spot": {"name": "A"}}},
+    )
+
+    row = build_added_row(
+        bucket="default-bucket",
+        run_id="run-1",
+        item={
+            "spot_id": "s1",
+            "raw_bucket": "raw-bucket",
+            "raw_key": "raw/s1.json.gz",
+            "terminal_status": "success",
+        },
+        valid_from="2026-05-01T06:10:00Z",
+    )
+
+    assert reads == [("raw-bucket", "raw/s1.json.gz")]
+    assert row["spot_id"] == "s1"
+    assert row["event_type"] == "added"
+    assert row["source_raw_key"] == "raw/s1.json.gz"
+
+
 def test_build_added_rows_reads_success_raw_reports_before_db_transaction(monkeypatch):
     reads = []
     monkeypatch.setattr(
@@ -141,12 +182,35 @@ def test_build_added_rows_reads_success_raw_reports_before_db_transaction(monkey
             {"spot_id": "s1", "raw_key": "raw/s1.json.gz", "terminal_status": "success"}
         ],
         valid_from="2026-05-01T06:10:00Z",
+        max_workers=2,
     )
 
     assert reads == [("default-bucket", "raw/s1.json.gz")]
     assert rows[0]["spot_id"] == "s1"
     assert rows[0]["event_type"] == "added"
     assert rows[0]["source_raw_key"] == "raw/s1.json.gz"
+
+
+def test_build_added_rows_propagates_s3_read_failure(monkeypatch):
+    monkeypatch.setattr(
+        "discovery_spot_batch_processor.handler._get_json",
+        lambda *_: (_ for _ in ()).throw(RuntimeError("s3 failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="s3 failed"):
+        build_added_rows(
+            bucket="default-bucket",
+            run_id="run-1",
+            success_items=[{"spot_id": "s1", "raw_key": "raw/s1.json.gz"}],
+            valid_from="2026-05-01T06:10:00Z",
+            max_workers=2,
+        )
+
+
+def test_s3_read_workers_uses_env_override(monkeypatch):
+    monkeypatch.setenv("DISCOVERY_SPOT_BATCH_S3_READ_WORKERS", "3")
+
+    assert _s3_read_workers() == 3
 
 
 def test_apply_changes_closes_removed_current_row_and_inserts_tombstone():
@@ -307,8 +371,8 @@ def test_apply_changes_closes_current_removed_tombstone_when_spot_is_readded():
 
     assert update_statements == [
         (
-            "update discovery_spot_versions set is_current=false, valid_to=%s where spot_id=%s and is_current=true",
-            ("2026-05-01T06:10:00Z", "readded"),
+            "update discovery_spot_versions set is_current=false, valid_to=%s where spot_id = any(%s) and is_current=true and event_type='removed'",
+            ("2026-05-01T06:10:00Z", ["readded"]),
         )
     ]
     assert len(insert_statements) == 1
