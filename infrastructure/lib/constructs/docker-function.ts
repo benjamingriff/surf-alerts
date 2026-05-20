@@ -7,6 +7,7 @@ export interface DockerFunctionProps {
   projectName: string;
   functionName: string;
   codePath: string;
+  dockerfile?: string;
   timeout: number;
   memorySize: number;
   environment?: Record<string, string>;
@@ -20,6 +21,7 @@ export class DockerFunction extends Construct {
 
     const imageAsset = new ecrAssets.DockerImageAsset(this, "DockerImage", {
       directory: props.codePath,
+      file: props.dockerfile,
     });
 
     this.lambdaFunction = new lambda.DockerImageFunction(this, "LambdaFn", {
