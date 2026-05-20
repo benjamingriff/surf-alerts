@@ -2,26 +2,88 @@ import * as cdk from "aws-cdk-lib";
 import * as path from "path";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as events from "aws-cdk-lib/aws-events";
-import * as targets from "aws-cdk-lib/aws-events-targets";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import { DockerFunction } from "./constructs/docker-function";
 import { ScheduledScraper } from "./constructs/scheduled-scraper";
 import { ScraperWorker } from "./constructs/scraper";
+import { SqsQueue } from "./constructs/sqs-queue";
 
 export class InfrastructureStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const projectName = "surf-alerts";
-    const codebuildSrcDir = process.env.CODEBUILD_SRC_DIR ?? ".";
+    const codebuildSrcDir =
+      process.env.CODEBUILD_SRC_DIR ?? path.join(__dirname, "..", "..");
 
     const dataBucket = new s3.Bucket(this, "DataBucket", {
       bucketName: `${projectName}-data`,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       encryption: s3.BucketEncryption.S3_MANAGED,
-      eventBridgeEnabled: true,
+      eventBridgeEnabled: false,
+      lifecycleRules: [
+        {
+          prefix: "raw/",
+          expiration: cdk.Duration.days(120),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+        },
+        {
+          prefix: "control/",
+          expiration: cdk.Duration.days(14),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+        },
+      ],
     });
+
+    const discoveryControlTable = new dynamodb.Table(
+      this,
+      "DiscoveryControlTable",
+      {
+        tableName: `${projectName}-discovery-control`,
+        partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+        sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        timeToLiveAttribute: "expires_at",
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+      },
+    );
+
+    const discoveryCompletionQueue = new SqsQueue(
+      this,
+      "DiscoveryCompletionQueue",
+      {
+        queueName: `${projectName}-discovery-completion-queue`,
+        visibilityTimeout: cdk.Duration.seconds(180),
+      },
+    );
+
+    const discoveryRunPlannerQueue = new SqsQueue(
+      this,
+      "DiscoveryRunPlannerQueue",
+      {
+        queueName: `${projectName}-discovery-run-planner-queue`,
+        visibilityTimeout: cdk.Duration.seconds(180),
+      },
+    );
+
+    const discoverySpotBatchProcessorQueue = new SqsQueue(
+      this,
+      "DiscoverySpotBatchProcessorQueue",
+      {
+        queueName: `${projectName}-discovery-spot-batch-processor-queue`,
+        visibilityTimeout: cdk.Duration.seconds(900),
+      },
+    );
+
+    const supabasePostgresUrl =
+      ssm.StringParameter.fromSecureStringParameterAttributes(
+        this,
+        "SupabasePostgresUrlParameter",
+        { parameterName: "/surf-alerts/supabase/postgres-url" },
+      );
 
     const sitemapScraper = new ScheduledScraper(
       this,
@@ -31,7 +93,6 @@ export class InfrastructureStack extends cdk.Stack {
         scraperName: "sitemap-scraper",
         codePath: path.join(
           codebuildSrcDir,
-          "..",
           "packages",
           "scrapers",
           "sitemap_scraper",
@@ -39,11 +100,15 @@ export class InfrastructureStack extends cdk.Stack {
         timeout: 60,
         memorySize: 1024,
         schedule: events.Schedule.cron({
+          day: "1",
           hour: "6",
           minute: "0",
-          weekDay: "MON",
         }),
         bucket: dataBucket,
+        environment: {
+          DISCOVERY_RUN_PLANNER_QUEUE_URL:
+            discoveryRunPlannerQueue.queue.queueUrl,
+        },
       },
     );
 
@@ -52,36 +117,44 @@ export class InfrastructureStack extends cdk.Stack {
       scraperName: "spot-scraper",
       codePath: path.join(
         codebuildSrcDir,
-        "..",
         "packages",
         "scrapers",
         "spot_scraper",
       ),
       timeout: 60,
       memorySize: 1024,
-      maxConcurrency: 2,
       environment: {
         DATA_BUCKET: dataBucket.bucketName,
+        DISCOVERY_COMPLETION_QUEUE_URL: discoveryCompletionQueue.queue.queueUrl,
       },
     });
 
-    const discoveryDiff = new DockerFunction(this, "DiscoveryDiffConstruct", {
-      projectName,
-      functionName: "discovery-diff",
-      codePath: path.join(
-        codebuildSrcDir,
-        "..",
-        "packages",
-        "jobs",
-        "discovery_diff",
-      ),
-      timeout: 120,
-      memorySize: 1024,
-      environment: {
-        DATA_BUCKET: dataBucket.bucketName,
-        SPOT_SCRAPER_QUEUE_URL: spotScraper.queue.queueUrl,
+    const discoveryRunPlanner = new DockerFunction(
+      this,
+      "DiscoveryRunPlannerConstruct",
+      {
+        projectName,
+        functionName: "discovery-run-planner",
+        codePath: codebuildSrcDir,
+        dockerfile: path.join(
+          "packages",
+          "jobs",
+          "discovery_run_planner",
+          "Dockerfile",
+        ),
+        timeout: 180,
+        memorySize: 1024,
+        environment: {
+          DATA_BUCKET: dataBucket.bucketName,
+          DISCOVERY_CONTROL_TABLE_NAME: discoveryControlTable.tableName,
+          SPOT_SCRAPER_QUEUE_URL: spotScraper.queue.queueUrl,
+          DISCOVERY_SPOT_BATCH_PROCESSOR_QUEUE_URL:
+            discoverySpotBatchProcessorQueue.queue.queueUrl,
+          SUPABASE_POSTGRES_URL_PARAMETER_NAME:
+            "/surf-alerts/supabase/postgres-url",
+        },
       },
-    });
+    );
 
     const discoveryCompletion = new DockerFunction(
       this,
@@ -89,175 +162,102 @@ export class InfrastructureStack extends cdk.Stack {
       {
         projectName,
         functionName: "discovery-completion",
-        codePath: path.join(
-          codebuildSrcDir,
-          "..",
+        codePath: codebuildSrcDir,
+        dockerfile: path.join(
           "packages",
           "jobs",
           "discovery_completion",
+          "Dockerfile",
         ),
         timeout: 180,
         memorySize: 1024,
         environment: {
-          DATA_BUCKET: dataBucket.bucketName,
+          DISCOVERY_CONTROL_TABLE_NAME: discoveryControlTable.tableName,
+          DISCOVERY_SPOT_BATCH_PROCESSOR_QUEUE_URL:
+            discoverySpotBatchProcessorQueue.queue.queueUrl,
         },
       },
     );
 
-    const discoveryFailureFinalizer = new DockerFunction(
+    const discoverySpotBatchProcessor = new DockerFunction(
       this,
-      "DiscoveryFailureFinalizerConstruct",
+      "DiscoverySpotBatchProcessorConstruct",
       {
         projectName,
-        functionName: "discovery-failure-finalizer",
-        codePath: path.join(
-          codebuildSrcDir,
-          "..",
+        functionName: "discovery-spot-batch-processor",
+        codePath: codebuildSrcDir,
+        dockerfile: path.join(
           "packages",
           "jobs",
-          "discovery_failure_finalizer",
+          "discovery_spot_batch_processor",
+          "Dockerfile",
         ),
-        timeout: 60,
-        memorySize: 512,
+        timeout: 900,
+        memorySize: 2048,
         environment: {
           DATA_BUCKET: dataBucket.bucketName,
-        },
-      },
-    );
-
-    const discoverySpotHistoryProcessor = new DockerFunction(
-      this,
-      "DiscoverySpotHistoryProcessorConstruct",
-      {
-        projectName,
-        functionName: "discovery-spot-history-processor",
-        codePath: path.join(
-          codebuildSrcDir,
-          "..",
-          "packages",
-          "jobs",
-          "discovery_spot_history_processor",
-        ),
-        timeout: 180,
-        memorySize: 1024,
-        environment: {
-          DATA_BUCKET: dataBucket.bucketName,
-        },
-      },
-    );
-
-    const discoveryCatalogBuilder = new DockerFunction(
-      this,
-      "DiscoveryCatalogBuilderConstruct",
-      {
-        projectName,
-        functionName: "discovery-catalog-builder",
-        codePath: path.join(
-          codebuildSrcDir,
-          "..",
-          "packages",
-          "jobs",
-          "discovery_catalog_builder",
-        ),
-        timeout: 180,
-        memorySize: 1024,
-        environment: {
-          DATA_BUCKET: dataBucket.bucketName,
+          DISCOVERY_CONTROL_TABLE_NAME: discoveryControlTable.tableName,
+          SUPABASE_POSTGRES_URL_PARAMETER_NAME:
+            "/surf-alerts/supabase/postgres-url",
         },
       },
     );
 
     dataBucket.grantReadWrite(sitemapScraper.lambdaFunction);
     dataBucket.grantReadWrite(spotScraper.lambdaFunction);
-    dataBucket.grantReadWrite(discoveryDiff.lambdaFunction);
-    dataBucket.grantReadWrite(discoveryCompletion.lambdaFunction);
-    dataBucket.grantReadWrite(discoveryFailureFinalizer.lambdaFunction);
-    dataBucket.grantReadWrite(discoverySpotHistoryProcessor.lambdaFunction);
-    dataBucket.grantReadWrite(discoveryCatalogBuilder.lambdaFunction);
-    spotScraper.queue.grantSendMessages(discoveryDiff.lambdaFunction);
-    spotScraper.deadLetterQueue.grantConsumeMessages(
-      discoveryFailureFinalizer.lambdaFunction,
+    dataBucket.grantReadWrite(discoveryRunPlanner.lambdaFunction);
+    dataBucket.grantReadWrite(discoverySpotBatchProcessor.lambdaFunction);
+    discoveryControlTable.grantReadWriteData(
+      discoveryRunPlanner.lambdaFunction,
     );
-    discoveryFailureFinalizer.lambdaFunction.addEventSource(
-      new lambdaEventSources.SqsEventSource(spotScraper.deadLetterQueue, {
+    discoveryControlTable.grantReadWriteData(
+      discoveryCompletion.lambdaFunction,
+    );
+    discoveryControlTable.grantReadWriteData(
+      discoverySpotBatchProcessor.lambdaFunction,
+    );
+    discoveryRunPlannerQueue.queue.grantSendMessages(
+      sitemapScraper.lambdaFunction,
+    );
+    spotScraper.queue.grantSendMessages(discoveryRunPlanner.lambdaFunction);
+    discoveryCompletionQueue.queue.grantSendMessages(
+      spotScraper.lambdaFunction,
+    );
+    discoverySpotBatchProcessorQueue.queue.grantSendMessages(
+      discoveryRunPlanner.lambdaFunction,
+    );
+    discoverySpotBatchProcessorQueue.queue.grantSendMessages(
+      discoveryCompletion.lambdaFunction,
+    );
+    supabasePostgresUrl.grantRead(discoveryRunPlanner.lambdaFunction);
+    supabasePostgresUrl.grantRead(discoverySpotBatchProcessor.lambdaFunction);
+
+    discoveryRunPlanner.lambdaFunction.addEventSource(
+      new lambdaEventSources.SqsEventSource(discoveryRunPlannerQueue.queue, {
         batchSize: 1,
         enabled: true,
-        reportBatchItemFailures: true,
-        maxConcurrency: 100,
+        reportBatchItemFailures: false,
+        maxConcurrency: 2,
       }),
     );
-
-    new events.Rule(this, "DiscoveryDiffRule", {
-      eventPattern: {
-        source: ["aws.s3"],
-        detailType: ["Object Created"],
-        detail: {
-          bucket: { name: [dataBucket.bucketName] },
-          object: { key: [{ prefix: "raw/sitemap/" }] },
+    discoveryCompletion.lambdaFunction.addEventSource(
+      new lambdaEventSources.SqsEventSource(discoveryCompletionQueue.queue, {
+        batchSize: 10,
+        enabled: true,
+        reportBatchItemFailures: false,
+        maxConcurrency: 20,
+      }),
+    );
+    discoverySpotBatchProcessor.lambdaFunction.addEventSource(
+      new lambdaEventSources.SqsEventSource(
+        discoverySpotBatchProcessorQueue.queue,
+        {
+          batchSize: 1,
+          enabled: true,
+          reportBatchItemFailures: false,
+          maxConcurrency: 2,
         },
-      },
-      targets: [new targets.LambdaFunction(discoveryDiff.lambdaFunction)],
-    });
-
-    new events.Rule(this, "DiscoveryCompletionRule", {
-      eventPattern: {
-        source: ["aws.s3"],
-        detailType: ["Object Created"],
-        detail: {
-          bucket: { name: [dataBucket.bucketName] },
-          object: {
-            key: [
-              { prefix: "control/completions/discovery_spot_scrapes/" },
-              { prefix: "control/completions/discovery_spot_scrapes_failed/" },
-            ],
-          },
-        },
-      },
-      targets: [new targets.LambdaFunction(discoveryCompletion.lambdaFunction)],
-    });
-
-    new events.Rule(this, "DiscoverySpotHistoryProcessorRule", {
-      eventPattern: {
-        source: ["aws.s3"],
-        detailType: ["Object Created"],
-        detail: {
-          bucket: { name: [dataBucket.bucketName] },
-          object: {
-            key: [
-              {
-                prefix:
-                  "control/manifests/processing/domain=discovery/stage=spot_history/",
-              },
-            ],
-          },
-        },
-      },
-      targets: [
-        new targets.LambdaFunction(
-          discoverySpotHistoryProcessor.lambdaFunction,
-        ),
-      ],
-    });
-
-    new events.Rule(this, "DiscoveryCatalogBuilderRule", {
-      eventPattern: {
-        source: ["aws.s3"],
-        detailType: ["Object Created"],
-        detail: {
-          bucket: { name: [dataBucket.bucketName] },
-          object: {
-            key: [
-              {
-                prefix:
-                  "control/manifests/processing/domain=discovery/stage=catalog_build/",
-              },
-            ],
-          },
-        },
-      },
-      targets: [
-        new targets.LambdaFunction(discoveryCatalogBuilder.lambdaFunction),
-      ],
-    });
+      ),
+    );
   }
 }
