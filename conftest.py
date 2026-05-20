@@ -11,11 +11,14 @@ from moto import mock_aws
 AWS_REGION = "eu-west-2"
 JOB_ID = "12345"
 REPO_ROOT = Path(__file__).resolve().parent
+os.environ.setdefault("DISCOVERY_CONTROL_TABLE_NAME", "discovery-control-test-table")
 SRC_PATHS = [
+    REPO_ROOT / "packages" / "jobs" / "discovery_control" / "src",
     REPO_ROOT / "packages" / "jobs" / "discovery_catalog_builder" / "src",
     REPO_ROOT / "packages" / "jobs" / "discovery_completion" / "src",
     REPO_ROOT / "packages" / "jobs" / "discovery_diff" / "src",
     REPO_ROOT / "packages" / "jobs" / "discovery_failure_finalizer" / "src",
+    REPO_ROOT / "packages" / "jobs" / "discovery_spot_history_planner" / "src",
     REPO_ROOT / "packages" / "jobs" / "discovery_spot_history_processor" / "src",
     REPO_ROOT / "packages" / "jobs" / "spot_reconciler" / "src",
     REPO_ROOT / "packages" / "scrapers" / "forecast_scraper" / "src",
@@ -45,6 +48,17 @@ def aws_env():
     os.environ["S3_BUCKET_NAME"] = "dataeng-squeegee-test-bucket"
     os.environ["JOB_TABLE_NAME"] = "dataeng-squeegee-test-job-table"
     os.environ["SQS_QUEUE_NAME"] = "dataeng-squeegee-test-queue"
+    os.environ["DISCOVERY_CONTROL_TABLE_NAME"] = "discovery-control-test-table"
+    os.environ["DISCOVERY_COMPLETION_QUEUE_URL"] = "https://example.com/discovery-completion-test"
+    os.environ["DISCOVERY_SPOT_HISTORY_PLANNER_QUEUE_URL"] = (
+        "https://example.com/discovery-planner-test"
+    )
+    os.environ["DISCOVERY_SPOT_HISTORY_CHUNK_QUEUE_URL"] = (
+        "https://example.com/discovery-history-chunk-test"
+    )
+    os.environ["DISCOVERY_CATALOG_BUILD_QUEUE_URL"] = (
+        "https://example.com/discovery-catalog-build-test"
+    )
     os.environ["QUEUE_REGISTRY_PREFIX"] = "/dataeng-squeegee-test/scrapers"
     os.environ["RS_SECRET_NAME"] = "redshift-creds-test"
     yield
@@ -54,9 +68,22 @@ def aws_env():
 def s3():
     with mock_aws():
         s3_client = boto3.client("s3", region_name=AWS_REGION)
+        dynamodb = boto3.client("dynamodb", region_name=AWS_REGION)
         s3_client.create_bucket(
             Bucket=os.environ["S3_BUCKET_NAME"],
             CreateBucketConfiguration={"LocationConstraint": AWS_REGION},
+        )
+        dynamodb.create_table(
+            TableName=os.environ["DISCOVERY_CONTROL_TABLE_NAME"],
+            KeySchema=[
+                {"AttributeName": "pk", "KeyType": "HASH"},
+                {"AttributeName": "sk", "KeyType": "RANGE"},
+            ],
+            AttributeDefinitions=[
+                {"AttributeName": "pk", "AttributeType": "S"},
+                {"AttributeName": "sk", "AttributeType": "S"},
+            ],
+            BillingMode="PAY_PER_REQUEST",
         )
         yield s3_client
 
