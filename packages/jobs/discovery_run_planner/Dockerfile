@@ -11,14 +11,15 @@ COPY packages/libs/discovery_control packages/libs/discovery_control
 
 RUN --mount=from=uv,source=/uv,target=/bin/uv \
    --mount=type=cache,target=/root/.cache/uv \
-   uv export --package discovery-run-planner --no-dev --no-editable -o requirements.txt \
-   && uv pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
+   mkdir /wheels \
+   && uv build --package discovery-control --wheel --out-dir /wheels \
+   && uv build --package postgres-client --wheel --out-dir /wheels \
+   && uv build --package discovery-run-planner --wheel --out-dir /wheels \
+   && uv pip install --find-links /wheels discovery-run-planner==0.1.0 --target "${LAMBDA_TASK_ROOT}"
 
 FROM public.ecr.aws/lambda/python:3.12
 
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
-COPY --from=builder /build/packages/libs/discovery_control/src/discovery_control ${LAMBDA_TASK_ROOT}/discovery_control
-COPY --from=builder /build/packages/libs/postgres_client/src/postgres_client ${LAMBDA_TASK_ROOT}/postgres_client
 
 ENV PYTHONPATH="${LAMBDA_TASK_ROOT}"
 
