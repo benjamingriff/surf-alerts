@@ -9,12 +9,13 @@ dependencies = []
 [tool.uv.workspace]
 members = [
     "packages/cli",
-    "packages/jobs/discovery_catalog_builder",
     "packages/jobs/discovery_completion",
-    "packages/jobs/discovery_diff",
-    "packages/jobs/discovery_failure_finalizer",
+    "packages/jobs/discovery_run_planner",
+    "packages/jobs/discovery_spot_batch_processor",
+    "packages/libs/discovery_spot_model",
+    "packages/libs/postgres_client",
+    "packages/libs/discovery_control",
     "packages/jobs/dispatcher",
-    "packages/jobs/discovery_spot_history_processor",
     "packages/jobs/spot_reconciler",
     "packages/migrations/archive_legacy_data",
     "packages/scrapers/forecast_scraper",
@@ -25,12 +26,13 @@ members = [
 
 [tool.uv.sources]
 cli = { workspace = true }
-discovery-catalog-builder = { workspace = true }
+discovery-control = { workspace = true }
 discovery-completion = { workspace = true }
-discovery-diff = { workspace = true }
-discovery-failure-finalizer = { workspace = true }
+discovery-run-planner = { workspace = true }
+discovery-spot-batch-processor = { workspace = true }
+discovery-spot-model = { workspace = true }
+postgres-client = { workspace = true }
 forecast-scraper = { workspace = true }
-discovery-spot-history-processor = { workspace = true }
 sitemap-scraper = { workspace = true }
 taxonomy-scraper = { workspace = true }
 spot-reconciler = { workspace = true }
@@ -39,12 +41,13 @@ spot-scraper = { workspace = true }
 [dependency-groups]
 dev = [
     "cli",
-    "discovery-catalog-builder",
+    "discovery-control",
     "discovery-completion",
-    "discovery-diff",
-    "discovery-failure-finalizer",
+    "discovery-run-planner",
+    "discovery-spot-batch-processor",
+    "discovery-spot-model",
+    "postgres-client",
     "forecast-scraper",
-    "discovery-spot-history-processor",
     "sitemap-scraper",
     "taxonomy-scraper",
     "spot-reconciler",
@@ -56,10 +59,18 @@ dev = [
 
 [tool.ruff]
 line-length = 100 
+extend-exclude = [
+ "infrastructure/cdk.out",
+ "packages/jobs/__*",
+]
 
 [tool.pytest.ini_options]
-addopts = "--import-mode=importlib"
-env = [
-  "POWERTOOLS_LOG_LEVEL=INFO",
+testpaths = ["packages"]
+norecursedirs = [
+  "__*",
+  ".git",
+  ".venv",
+  "node_modules",
 ]
+addopts = "--import-mode=importlib"
 python_files = "test_*.py"
