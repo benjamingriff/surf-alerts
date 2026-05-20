@@ -7,45 +7,44 @@ test("discovery infrastructure resources are synthesized", () => {
   const stack = new InfrastructureStack(app, "SufAlertsStack");
   const template = Template.fromStack(stack);
 
-  template.resourceCountIs("AWS::Events::Rule", 5);
-
   [
     "surf-alerts-sitemap-scraper",
     "surf-alerts-spot-scraper",
-    "surf-alerts-discovery-diff",
+    "surf-alerts-discovery-run-planner",
     "surf-alerts-discovery-completion",
-    "surf-alerts-discovery-failure-finalizer",
-    "surf-alerts-discovery-spot-history-processor",
-    "surf-alerts-discovery-catalog-builder",
+    "surf-alerts-discovery-spot-batch-processor",
   ].forEach((functionName) => {
-    template.hasResourceProperties("AWS::Lambda::Function", {
-      FunctionName: functionName,
-    });
+    template.hasResourceProperties("AWS::Lambda::Function", { FunctionName: functionName });
   });
 
-  template.hasResourceProperties("AWS::SQS::Queue", {
-    QueueName: "surf-alerts-spot-scraper-queue",
+  [
+    "surf-alerts-spot-scraper-queue",
+    "surf-alerts-discovery-completion-queue",
+    "surf-alerts-discovery-run-planner-queue",
+    "surf-alerts-discovery-spot-batch-processor-queue",
+  ].forEach((queueName) => template.hasResourceProperties("AWS::SQS::Queue", { QueueName: queueName }));
+
+  template.hasResourceProperties("AWS::DynamoDB::Table", {
+    TableName: "surf-alerts-discovery-control",
+    TimeToLiveSpecification: { AttributeName: "expires_at", Enabled: true },
   });
 
+  template.resourceCountIs("AWS::Events::Rule", 1);
   template.hasResourceProperties("AWS::Events::Rule", {
-    EventPattern: {
-      source: ["aws.s3"],
-      "detail-type": ["Object Created"],
-      detail: {
-        object: {
-          key: Match.arrayWith([Match.objectLike({ prefix: "raw/sitemap/" })]),
-        },
-      },
+    ScheduleExpression: "cron(0 6 1 * ? *)",
+  });
+
+  template.hasResourceProperties("AWS::S3::Bucket", {
+    LifecycleConfiguration: {
+      Rules: Match.arrayWith([
+        Match.objectLike({ Prefix: "raw/", Status: "Enabled" }),
+        Match.objectLike({ Prefix: "control/", Status: "Enabled" }),
+      ]),
     },
   });
 
   template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
-    BatchSize: 1,
-    EventSourceArn: {
-      "Fn::GetAtt": [Match.stringLikeRegexp("SpotScraperConstructScraperQueueQueueDLQ"), "Arn"],
-    },
-    FunctionName: {
-      Ref: Match.stringLikeRegexp("DiscoveryFailureFinalizerConstructLambdaFn"),
-    },
+    BatchSize: 10,
+    FunctionName: { Ref: Match.stringLikeRegexp("DiscoveryCompletionConstructLambdaFn") },
   });
 });
