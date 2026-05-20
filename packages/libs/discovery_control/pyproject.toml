@@ -1,0 +1,13 @@
+[project]
+name = "discovery-control"
+version = "0.1.0"
+description = "Shared DynamoDB discovery control state helpers"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.42.15",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.14,<0.10.0"]
+build-backend = "uv_build"
