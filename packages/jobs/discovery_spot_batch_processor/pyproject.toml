@@ -1,0 +1,15 @@
+[project]
+name = "discovery-spot-batch-processor"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "aws-lambda-powertools>=3.0.0",
+  "boto3>=1.35.0", 
+  "postgres-client",
+  "discovery-control",
+  "discovery-spot-model"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
