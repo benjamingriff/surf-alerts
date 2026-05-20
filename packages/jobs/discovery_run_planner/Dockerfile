@@ -18,6 +18,6 @@ FROM public.ecr.aws/lambda/python:3.12
 
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
 
-ENV PYTHONPATH="${LAMBDA_TASK_ROOT}:${PYTHONPATH}"
+ENV PYTHONPATH="${LAMBDA_TASK_ROOT}"
 
 CMD ["discovery_run_planner.handler.lambda_handler"]
