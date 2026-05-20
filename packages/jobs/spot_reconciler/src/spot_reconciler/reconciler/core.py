@@ -89,34 +89,40 @@ def detect_changes(
 
     # New spots
     for spot_id in current_ids - previous_ids:
-        changes.append({
-            "spot_id": spot_id,
-            "change_type": "added",
-            "timestamp": timestamp,
-            "checksum": current[spot_id]["checksum"],
-            "data": current[spot_id],
-        })
+        changes.append(
+            {
+                "spot_id": spot_id,
+                "change_type": "added",
+                "timestamp": timestamp,
+                "checksum": current[spot_id]["checksum"],
+                "data": current[spot_id],
+            }
+        )
 
     # Removed spots
     for spot_id in previous_ids - current_ids:
-        changes.append({
-            "spot_id": spot_id,
-            "change_type": "removed",
-            "timestamp": timestamp,
-            "previous_checksum": previous[spot_id].get("checksum"),
-        })
+        changes.append(
+            {
+                "spot_id": spot_id,
+                "change_type": "removed",
+                "timestamp": timestamp,
+                "previous_checksum": previous[spot_id].get("checksum"),
+            }
+        )
 
     # Modified spots (checksum changed)
     for spot_id in current_ids & previous_ids:
         if current[spot_id]["checksum"] != previous[spot_id].get("checksum"):
-            changes.append({
-                "spot_id": spot_id,
-                "change_type": "modified",
-                "timestamp": timestamp,
-                "previous_checksum": previous[spot_id].get("checksum"),
-                "new_checksum": current[spot_id]["checksum"],
-                "data": current[spot_id],
-            })
+            changes.append(
+                {
+                    "spot_id": spot_id,
+                    "change_type": "modified",
+                    "timestamp": timestamp,
+                    "previous_checksum": previous[spot_id].get("checksum"),
+                    "new_checksum": current[spot_id]["checksum"],
+                    "data": current[spot_id],
+                }
+            )
 
     return changes
 
