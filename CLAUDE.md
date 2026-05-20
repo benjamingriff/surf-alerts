@@ -11,20 +11,20 @@ Surf-alerts is a serverless Python/TypeScript project that scrapes surf forecast
 ### Python (UV package manager)
 
 ```bash
-# Install all dependencies
-uv sync
+# Install all dependencies, including workspace packages
+uv sync --all-packages --dev
 
-# Run all tests
-pytest
+# Run all tests with workspace packages available
+uv run --all-packages pytest
 
 # Run tests for specific package
-pytest packages/scrapers/forecast_scraper
+uv run --all-packages pytest packages/scrapers/forecast_scraper
 
 # Run single test file
-pytest packages/scrapers/forecast_scraper/tests/smoke/test_scrape_forecast_live.py -v
+uv run --all-packages pytest packages/scrapers/forecast_scraper/tests/smoke/test_scrape_forecast_live.py -v
 
 # Lint with ruff
-ruff check .
+uv run ruff check .
 ```
 
 ### Infrastructure (AWS CDK)

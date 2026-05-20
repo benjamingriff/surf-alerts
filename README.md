@@ -5,14 +5,14 @@ Serverless platform that scrapes surf forecast data from Surfline and stores it 
 ## Quick Start
 
 ```bash
-# Install dependencies
-uv sync
+# Install dependencies, including all workspace packages
+uv sync --all-packages --dev
 
-# Run tests
-pytest
+# Run tests with all workspace packages available
+uv run --all-packages pytest
 
 # Lint
-ruff check .
+uv run ruff check .
 ```
 
 ### Infrastructure

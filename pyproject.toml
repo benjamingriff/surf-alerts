@@ -40,18 +40,6 @@ spot-scraper = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "cli",
-    "discovery-control",
-    "discovery-completion",
-    "discovery-run-planner",
-    "discovery-spot-batch-processor",
-    "discovery-spot-model",
-    "postgres-client",
-    "forecast-scraper",
-    "sitemap-scraper",
-    "taxonomy-scraper",
-    "spot-reconciler",
-    "spot-scraper",
     "moto>=5.1.19",
     "pytest>=9.0.2",
     "rich>=14.2.0",
