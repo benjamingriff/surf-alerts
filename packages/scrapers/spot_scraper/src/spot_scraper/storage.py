@@ -1,13 +1,12 @@
-from datetime import datetime
-
-
 SCHEMA_VERSION = 1
 SOURCE_TYPE = "spot_report"
 
 
-def build_spot_report_key(spot_id: str, scraped_at: datetime, run_id: str) -> str:
-    scrape_date = scraped_at.strftime("%Y-%m-%d")
-    return f"raw/spot_report/spot_id={spot_id}/scrape_date={scrape_date}/run_id={run_id}.json.gz"
+def build_spot_report_key(*, scrape_date: str, discovery_run_id: str, spot_id: str) -> str:
+    return (
+        f"raw/spot_report/scrape_date={scrape_date}/"
+        f"discovery_run_id={discovery_run_id}/spot_id={spot_id}.json.gz"
+    )
 
 
 def build_raw_spot_payload(
