@@ -1,12 +1,13 @@
 [project]
 name = "discovery-completion"
 version = "0.1.0"
-description = "Emits processing manifests once a discovery run's spot scrapes are complete"
+description = "Reduces discovery spot scrape completion messages into DynamoDB run state"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aws-lambda-powertools>=3.23.0",
     "boto3>=1.42.15",
+    "discovery-control"
 ]
 
 [build-system]

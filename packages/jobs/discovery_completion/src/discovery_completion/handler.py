@@ -1,208 +1,128 @@
-import re
-import time
+import json
+import os
 from datetime import datetime, timezone
-from urllib.parse import unquote_plus
+from typing import Any
 
+import boto3
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 from discovery_completion.logger import get_logger, inject_lambda_context
-from discovery_completion.s3 import S3Client
+from discovery_control import (
+    ControlStore,
+    RUN_STATUS_SPOT_PROCESSING_QUEUED,
+    RUN_STATUS_SPOT_SCRAPES_COMPLETE,
+    RUN_STATUS_WAITING_FOR_SPOT_SCRAPES,
+)
 
 logger = get_logger()
-s3_client = S3Client()
 SCHEMA_VERSION = 1
 
-RUN_CONTEXT_PATTERN = re.compile(
-    r"control/completions/discovery_spot_scrapes(?:_failed)?/date=(?P<scrape_date>\d{4}-\d{2}-\d{2})/"
-    r"discovery_run_id=(?P<discovery_run_id>[^/]+)/"
-)
-SUCCESS_COMPLETION_KEY_PATTERN = re.compile(
-    r"control/completions/discovery_spot_scrapes/date=(?P<scrape_date>\d{4}-\d{2}-\d{2})/"
-    r"discovery_run_id=(?P<discovery_run_id>[^/]+)/spot_id=(?P<spot_id>[^/]+)/"
-    r"raw_run_id=(?P<raw_run_id>[^/]+)\.json\.gz$"
-)
-FAILED_COMPLETION_KEY_PATTERN = re.compile(
-    r"control/completions/discovery_spot_scrapes_failed/date=(?P<scrape_date>\d{4}-\d{2}-\d{2})/"
-    r"discovery_run_id=(?P<discovery_run_id>[^/]+)/spot_id=(?P<spot_id>[^/]+)\.json\.gz$"
-)
-SUCCESS_COMPLETION_PREFIX = "control/completions/discovery_spot_scrapes"
-FAILED_COMPLETION_PREFIX = "control/completions/discovery_spot_scrapes_failed"
+
+def _store() -> ControlStore:
+    return ControlStore()
 
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+def _sqs_client():
+    return boto3.client("sqs")
 
 
-def _parse_s3_reference(event: dict) -> tuple[str, str]:
-    if "detail" in event:
-        return event["detail"]["bucket"]["name"], unquote_plus(event["detail"]["object"]["key"])
-
-    record = event["Records"][0]
-    return record["s3"]["bucket"]["name"], unquote_plus(record["s3"]["object"]["key"])
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
-def _extract_run_context(key: str) -> tuple[str, str]:
-    match = RUN_CONTEXT_PATTERN.search(key)
-    if not match:
-        raise ValueError(f"Could not derive discovery run context from key: {key}")
-    return match.group("scrape_date"), match.group("discovery_run_id")
+def _completion_timestamp(payload: dict[str, Any]) -> str:
+    return payload.get("completed_at") or payload.get("failed_at") or _utc_now_iso()
 
 
-def _discovery_manifest_key(scrape_date: str, discovery_run_id: str) -> str:
-    return (
-        "control/manifests/discovery_runs/"
-        f"date={scrape_date}/discovery_run_id={discovery_run_id}/manifest.json.gz"
+def build_batch_processor_message(*, discovery_run_id: str, requested_at: str) -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "message_type": "discovery_spot_batch_process_requested",
+        "discovery_run_id": discovery_run_id,
+        "requested_at": requested_at,
+    }
+
+
+def _batch_processor_queue_url() -> str:
+    return os.environ["DISCOVERY_SPOT_BATCH_PROCESSOR_QUEUE_URL"]
+
+
+def _send_batch_processor_request(*, discovery_run_id: str) -> None:
+    _sqs_client().send_message(
+        QueueUrl=_batch_processor_queue_url(),
+        MessageBody=json.dumps(
+            build_batch_processor_message(
+                discovery_run_id=discovery_run_id,
+                requested_at=_utc_now_iso(),
+            )
+        ),
     )
 
 
-def _completion_prefix(prefix_root: str, scrape_date: str, discovery_run_id: str) -> str:
-    return f"{prefix_root}/date={scrape_date}/discovery_run_id={discovery_run_id}/"
-
-
-def _raw_report_key(scrape_date: str, spot_id: str, raw_run_id: str) -> str:
-    return f"raw/spot_report/spot_id={spot_id}/scrape_date={scrape_date}/run_id={raw_run_id}.json.gz"
-
-
-def _scan_success_markers(bucket: str, scrape_date: str, discovery_run_id: str) -> tuple[int, dict[str, str]]:
-    success_count = 0
-    raw_keys_by_spot_id: dict[str, str] = {}
-    prefix = _completion_prefix(SUCCESS_COMPLETION_PREFIX, scrape_date, discovery_run_id)
-
-    for key in s3_client.list_keys(bucket, prefix):
-        match = SUCCESS_COMPLETION_KEY_PATTERN.search(key)
-        if not match:
-            raise ValueError(f"Unsupported legacy discovery success marker key: {key}")
-
-        success_count += 1
-        raw_keys_by_spot_id[match.group("spot_id")] = _raw_report_key(
-            scrape_date=scrape_date,
-            spot_id=match.group("spot_id"),
-            raw_run_id=match.group("raw_run_id"),
-        )
-
-    return success_count, raw_keys_by_spot_id
-
-
-def _scan_failure_markers(bucket: str, scrape_date: str, discovery_run_id: str) -> tuple[int, list[str]]:
-    failed_keys: list[str] = []
-    prefix = _completion_prefix(FAILED_COMPLETION_PREFIX, scrape_date, discovery_run_id)
-
-    for key in s3_client.list_keys(bucket, prefix):
-        if FAILED_COMPLETION_KEY_PATTERN.search(key):
-            failed_keys.append(key)
-
-    return len(failed_keys), failed_keys
-
-
-def _load_failure_markers(bucket: str, keys: list[str]) -> dict[str, dict]:
-    failures_by_spot_id: dict[str, dict] = {}
-    for key in keys:
-        payload = s3_client.get_json(bucket, key)
-        if payload and payload.get("spot_id"):
-            failures_by_spot_id[payload["spot_id"]] = payload
-    return failures_by_spot_id
-
-
-def _processing_manifest_key(scrape_date: str, discovery_run_id: str) -> str:
-    return (
-        "control/manifests/processing/"
-        f"domain=discovery/stage=spot_history/date={scrape_date}/discovery_run_id={discovery_run_id}.json.gz"
+def process_completion_message(payload: dict[str, Any], *, store: ControlStore | None = None) -> str:
+    store = store or _store()
+    discovery_run_id = payload["discovery_run_id"]
+    newly_terminal = store.mark_spot_terminal(
+        discovery_run_id=discovery_run_id,
+        spot_id=payload["spot_id"],
+        terminal_status=payload["terminal_status"],
+        completed_at=_completion_timestamp(payload),
+        raw_key=payload.get("raw_key"),
+        raw_bucket=payload.get("raw_bucket"),
+        failure_reason=payload.get("failure_reason"),
+        failure_source=payload.get("failure_source"),
     )
+    if not newly_terminal:
+        return "duplicate"
+
+    run = store.get_run(discovery_run_id)
+    if run is None:
+        raise FileNotFoundError(f"Missing discovery run state: {discovery_run_id}")
+
+    if run.get("terminal_scrape_count") != run.get("expected_spot_count"):
+        return "recorded"
+
+    transitioned_to_complete = store.transition_run_status(
+        discovery_run_id=discovery_run_id,
+        from_status=RUN_STATUS_WAITING_FOR_SPOT_SCRAPES,
+        to_status=RUN_STATUS_SPOT_SCRAPES_COMPLETE,
+    )
+    if not transitioned_to_complete:
+        return "recorded"
+
+    queued = store.transition_run_status(
+        discovery_run_id=discovery_run_id,
+        from_status=RUN_STATUS_SPOT_SCRAPES_COMPLETE,
+        to_status=RUN_STATUS_SPOT_PROCESSING_QUEUED,
+    )
+    if queued:
+        _send_batch_processor_request(discovery_run_id=discovery_run_id)
+        return "queued_batch_processor"
+
+    return "recorded"
 
 
 @inject_lambda_context(log_event=False)
 def lambda_handler(event: dict, context: LambdaContext):
-    handler_start = time.perf_counter()
-    bucket, key = _parse_s3_reference(event)
-    scrape_date, discovery_run_id = _extract_run_context(key)
-    manifest_key = _discovery_manifest_key(scrape_date, discovery_run_id)
+    processed = 0
+    deduplicated = 0
+    queued = 0
+    store = _store()
 
-    manifest_start = time.perf_counter()
-    manifest = s3_client.get_json(bucket, manifest_key)
-    manifest_load_ms = round((time.perf_counter() - manifest_start) * 1000, 2)
-    if manifest is None:
-        raise FileNotFoundError(f"Missing discovery manifest: s3://{bucket}/{manifest_key}")
+    for record in event["Records"]:
+        result = process_completion_message(json.loads(record["body"]), store=store)
+        if result == "duplicate":
+            deduplicated += 1
+        else:
+            processed += 1
+        if result == "queued_batch_processor":
+            queued += 1
 
-    processing_manifest_key = _processing_manifest_key(scrape_date, discovery_run_id)
-    if s3_client.object_exists(bucket, processing_manifest_key):
-        logger.info("Processing manifest already exists", extra={"processing_manifest_key": processing_manifest_key})
-        return {"statusCode": 200, "body": "duplicate completion event ignored"}
-
-    expected_count = manifest["added_spot_count"]
-
-    success_scan_start = time.perf_counter()
-    success_count, raw_keys_by_spot_id = _scan_success_markers(
-        bucket,
-        scrape_date,
-        discovery_run_id,
-    )
-    success_scan_ms = round((time.perf_counter() - success_scan_start) * 1000, 2)
-
-    failure_scan_start = time.perf_counter()
-    failed_count, failed_keys = _scan_failure_markers(bucket, scrape_date, discovery_run_id)
-    failure_scan_ms = round((time.perf_counter() - failure_scan_start) * 1000, 2)
-
-    terminal_count = success_count + failed_count
-    scan_metrics = {
-        "manifest_load_ms": manifest_load_ms,
-        "success_scan_ms": success_scan_ms,
-        "failure_scan_ms": failure_scan_ms,
-        "successful_count": success_count,
-        "failed_count": failed_count,
-        "terminal_count": terminal_count,
-        "expected_count": expected_count,
-        "failed_marker_count": len(failed_keys),
-        "handler_elapsed_ms": round((time.perf_counter() - handler_start) * 1000, 2),
-    }
-
-    if terminal_count < expected_count:
-        logger.info("Discovery run not complete yet", extra=scan_metrics)
-        return {"statusCode": 200, "body": "waiting for remaining spot scrapes"}
-
-    failure_load_start = time.perf_counter()
-    failures_by_spot_id = _load_failure_markers(bucket, failed_keys)
-    failure_load_ms = round((time.perf_counter() - failure_load_start) * 1000, 2)
-
-    ordered_spot_ids = [spot_id for spot_id in manifest["added_spot_ids"] if spot_id in raw_keys_by_spot_id]
-    raw_keys = [raw_keys_by_spot_id[spot_id] for spot_id in ordered_spot_ids]
-    failed_spot_ids = [spot_id for spot_id in manifest["added_spot_ids"] if spot_id in failures_by_spot_id]
-    failed_spots = [
-        {
-            "spot_id": spot_id,
-            "failure_reason": failures_by_spot_id[spot_id].get("failure_reason"),
-            "failure_source": failures_by_spot_id[spot_id].get("failure_source"),
-            "completed_at": failures_by_spot_id[spot_id].get("completed_at"),
-        }
-        for spot_id in failed_spot_ids
-    ]
-
-    manifest_write_start = time.perf_counter()
-    s3_client.put_json(
-        bucket,
-        processing_manifest_key,
-        {
-            "schema_version": SCHEMA_VERSION,
-            "manifest_type": "processing_manifest",
-            "domain": "discovery",
-            "stage": "spot_history",
-            "discovery_run_id": discovery_run_id,
-            "scrape_date": scrape_date,
-            "source_manifest_key": manifest_key,
-            "spot_ids": ordered_spot_ids,
-            "raw_keys": raw_keys,
-            "failed_spot_ids": failed_spot_ids,
-            "failed_spot_count": len(failed_spot_ids),
-            "failed_spots": failed_spots,
-            "ready_at": _utc_now().isoformat(),
-        },
-    )
     logger.info(
-        "Discovery spot history manifest emitted",
-        extra={
-            **scan_metrics,
-            "failure_load_ms": failure_load_ms,
-            "manifest_write_ms": round((time.perf_counter() - manifest_write_start) * 1000, 2),
-            "handler_elapsed_ms": round((time.perf_counter() - handler_start) * 1000, 2),
-        },
+        "Discovery completion batch reduced",
+        extra={"processed": processed, "deduplicated": deduplicated, "queued": queued},
     )
-    return {"statusCode": 200, "body": "spot history manifest emitted"}
+    return {
+        "statusCode": 200,
+        "body": json.dumps({"processed": processed, "deduplicated": deduplicated, "queued": queued}),
+    }
