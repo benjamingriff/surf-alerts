@@ -1,3 +1,8 @@
+import json
+from pathlib import Path
+
+import pytest
+
 from discovery_spot_model import (
     build_added_spot_version_row,
     build_removed_tombstone_row,
@@ -7,46 +12,50 @@ from discovery_spot_model import (
 )
 
 
-def test_raw_spot_report_envelope_to_added_scd2_row_success_path():
-    raw_envelope = {
-        "schema_version": 1,
-        "source_type": "spot_report",
-        "spot_id": "spot-a",
-        "discovery_run_id": "run-1",
-        "raw_payload": {
-            "spot": {
-                "name": "Bundoran",
-                "location": {"lat": 54.477, "lon": -8.28},
-                "timezone": "Europe/Dublin",
-                "utcOffset": 0,
-                "abbrTimezone": "GMT",
-                "subregion": {"_id": "sub-1", "name": "Donegal"},
-                "sitemapLink": "/surf-report/bundoran/spot-a",
-                "forecastLink": "/surf-forecasts/bundoran/spot-a",
-                "abilityLevels": ["INTERMEDIATE", "BEGINNER"],
-                "boardTypes": [{"name": "Shortboard"}],
-                "travelDetails": {"best": {"season": "winter"}},
-            }
-        },
-    }
+EXAMPLE_SPOT_PATH = (
+    Path(__file__).resolve().parents[5] / "data" / "spot" / "2026-05-21T11-33-01" / "data.json"
+)
 
-    canonical = canonicalize_spot_report(raw_envelope, "spot-a")
+
+def test_current_spot_scraper_payload_to_added_scd2_row_success_path():
+    raw_payload = json.loads(EXAMPLE_SPOT_PATH.read_text())
+    spot_id = raw_payload["spot"]["spot_id"]
+
+    canonical = canonicalize_spot_report(raw_payload, spot_id)
     row = build_added_spot_version_row(
         canonical_spot=canonical,
         discovery_run_id="run-1",
-        source_raw_key="raw/spot_report/scrape_date=2026-05-01/discovery_run_id=run-1/spot_id=spot-a.json.gz",
-        valid_from="2026-05-01T06:10:00Z",
+        source_raw_key=f"raw/spot_report/scrape_date=2026-05-21/discovery_run_id=run-1/spot_id={spot_id}.json.gz",
+        valid_from="2026-05-21T10:10:00Z",
     )
 
     checksum = compute_spot_checksum(canonical)
-    assert row["spot_version_id"] == deterministic_spot_version_id("spot-a", checksum)
-    assert row["spot_id"] == "spot-a"
+    assert row["spot_version_id"] == deterministic_spot_version_id(spot_id, checksum)
+    assert row["spot_id"] == spot_id
     assert row["event_type"] == "added"
     assert row["is_current"] is True
     assert row["content_checksum"] == checksum
     assert row["source_type"] == "spot_report"
-    assert row["name"] == "Bundoran"
-    assert row["ability_levels"] == ["BEGINNER", "INTERMEDIATE"]
+    assert row["name"] == "Rest Bay"
+    assert row["lat"] == 51.488
+    assert row["lon"] == -3.728
+    assert row["timezone"] == "Europe/London"
+    assert row["utc_offset"] == 1
+    assert row["abbr_timezone"] == "BST"
+    assert row["href"] == "https://www.surfline.com/surf-report/rest-bay/584204204e65fad6a77090d2"
+    assert "cameras" not in row
+    assert "ability_levels" not in row
+    assert "board_types" not in row
+
+
+@pytest.mark.parametrize("field", ["spot_id", "name", "lat", "lon", "timezone", "utc_offset", "abbr_timezone", "href"])
+def test_current_spot_scraper_payload_requires_core_fields(field):
+    raw_payload = json.loads(EXAMPLE_SPOT_PATH.read_text())
+    spot_id = raw_payload["spot"]["spot_id"]
+    raw_payload["spot"].pop(field)
+
+    with pytest.raises(ValueError, match="Missing required spot fields"):
+        canonicalize_spot_report(raw_payload, spot_id)
 
 
 def test_current_active_row_to_removed_tombstone_success_path():
@@ -62,14 +71,9 @@ def test_current_active_row_to_removed_tombstone_success_path():
         "timezone": "Europe/Dublin",
         "utc_offset": 0,
         "abbr_timezone": "GMT",
-        "subregion_id": "sub-1",
-        "subregion_name": "Donegal",
-        "sitemap_link": "/surf-report/bundoran/spot-a",
-        "forecast_link": "/surf-forecasts/bundoran/spot-a",
+        "href": "/surf-report/bundoran/spot-a",
         "breadcrumbs": [{"name": "Ireland"}],
-        "cameras": [],
-        "ability_levels": ["BEGINNER", "INTERMEDIATE"],
-        "board_types": [{"name": "Shortboard"}],
+        "subregion": {"_id": "sub-1", "name": "Donegal"},
         "travel_details": {"best": {"season": "winter"}},
     }
 
@@ -88,6 +92,7 @@ def test_current_active_row_to_removed_tombstone_success_path():
     assert tombstone["source_type"] == "sitemap"
     assert tombstone["content_checksum"] == "old-checksum"
     assert tombstone["name"] == "Bundoran"
+    assert tombstone["href"] == "/surf-report/bundoran/spot-a"
     assert tombstone["travel_details"] == {"best": {"season": "winter"}}
 
 
@@ -103,19 +108,15 @@ def test_failed_scrape_payload_is_not_convertible_to_added_business_row():
         "failure_reason": "HTTP 403",
     }
 
-    canonical = canonicalize_spot_report(failed_completion_payload, "spot-a")
-
-    # The model can tolerate unexpected payloads for robustness, but the batch processor should
-    # only pass successful raw spot report envelopes. A failure completion has no Surfline spot data.
-    assert canonical["name"] is None
-    assert canonical["lat"] is None
-    assert canonical["lon"] is None
+    with pytest.raises(ValueError, match="Missing required spot fields"):
+        canonicalize_spot_report(failed_completion_payload, "spot-a")
 
 
 def test_checksum_changes_when_canonical_business_content_changes():
-    raw = {"raw_payload": {"spot": {"name": "A", "location": {"lat": 1, "lon": 2}}}}
-    changed = {"raw_payload": {"spot": {"name": "B", "location": {"lat": 1, "lon": 2}}}}
+    raw = json.loads(EXAMPLE_SPOT_PATH.read_text())
+    changed = json.loads(EXAMPLE_SPOT_PATH.read_text())
+    changed["spot"]["name"] = "Rest Bay Changed"
 
-    assert compute_spot_checksum(canonicalize_spot_report(raw, "spot-a")) != compute_spot_checksum(
-        canonicalize_spot_report(changed, "spot-a")
+    assert compute_spot_checksum(canonicalize_spot_report(raw, raw["spot"]["spot_id"])) != compute_spot_checksum(
+        canonicalize_spot_report(changed, changed["spot"]["spot_id"])
     )

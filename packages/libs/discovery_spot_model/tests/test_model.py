@@ -1,9 +1,25 @@
 from discovery_spot_model import (
+    build_removed_tombstone_row,
     canonicalize_spot_report,
     compute_spot_checksum,
     deterministic_discovery_run_id,
-    build_removed_tombstone_row,
 )
+
+
+def _payload(name="A"):
+    return {
+        "raw_payload": {
+            "spot": {
+                "spot_id": "spot-a",
+                "name": name,
+                "location": {"lon": 2, "lat": 1},
+                "timezone": "Europe/London",
+                "utcOffset": 0,
+                "abbrTimezone": "GMT",
+                "href": "https://example.com/spot-a",
+            }
+        }
+    }
 
 
 def test_deterministic_run_id_is_day_scoped():
@@ -16,17 +32,8 @@ def test_deterministic_run_id_is_day_scoped():
 
 
 def test_canonical_checksum_ignores_key_order():
-    payload = {
-        "raw_payload": {
-            "spot": {
-                "name": "A",
-                "location": {"lon": 2, "lat": 1},
-                "boardTypes": [{"b": 2, "a": 1}],
-            }
-        }
-    }
-    a = canonicalize_spot_report(payload, "spot-a")
-    b = canonicalize_spot_report(payload, "spot-a")
+    a = canonicalize_spot_report(_payload(), "spot-a")
+    b = canonicalize_spot_report(_payload(), "spot-a")
     assert a["lat"] == 1
     assert compute_spot_checksum(a) == compute_spot_checksum(b)
 

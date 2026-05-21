@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import pytest
 
 from discovery_spot_model import build_added_spot_version_row, canonicalize_spot_report
@@ -12,6 +14,23 @@ from discovery_spot_batch_processor.handler import (
     serialize_row_values,
     should_process_run,
 )
+
+
+def raw_spot(name="A", spot_id="s1"):
+    return {
+        "raw_payload": {
+            "spot": {
+                "spot_id": spot_id,
+                "name": name,
+                "lat": 1,
+                "lon": 2,
+                "timezone": "Europe/London",
+                "utc_offset": 0,
+                "abbr_timezone": "GMT",
+                "href": f"https://example.com/{spot_id}",
+            }
+        }
+    }
 
 
 class FakeStore:
@@ -147,7 +166,7 @@ def test_build_added_row_reads_raw_and_builds_version(monkeypatch):
     reads = []
     monkeypatch.setattr(
         "discovery_spot_batch_processor.handler._get_json",
-        lambda bucket, key: reads.append((bucket, key)) or {"raw_payload": {"spot": {"name": "A"}}},
+        lambda bucket, key: reads.append((bucket, key)) or raw_spot("A", "s1"),
     )
 
     row = build_added_row(
@@ -172,7 +191,7 @@ def test_build_added_rows_reads_success_raw_reports_before_db_transaction(monkey
     reads = []
     monkeypatch.setattr(
         "discovery_spot_batch_processor.handler._get_json",
-        lambda bucket, key: reads.append((bucket, key)) or {"raw_payload": {"spot": {"name": "A"}}},
+        lambda bucket, key: reads.append((bucket, key)) or raw_spot("A", "s1"),
     )
 
     rows = build_added_rows(
@@ -236,7 +255,7 @@ def test_apply_changes_closes_removed_current_row_and_inserts_tombstone():
 
 
 def test_apply_changes_inserts_added_row_when_no_current_conflict():
-    canonical = canonicalize_spot_report({"raw_payload": {"spot": {"name": "New"}}}, "new")
+    canonical = canonicalize_spot_report(raw_spot("New", "new"), "new")
     added = build_added_spot_version_row(
         canonical_spot=canonical,
         discovery_run_id="run-1",
@@ -259,7 +278,7 @@ def test_apply_changes_inserts_added_row_when_no_current_conflict():
 
 
 def test_apply_changes_skips_idempotent_existing_added_version():
-    canonical = canonicalize_spot_report({"raw_payload": {"spot": {"name": "New"}}}, "new")
+    canonical = canonicalize_spot_report(raw_spot("New", "new"), "new")
     added = build_added_spot_version_row(
         canonical_spot=canonical,
         discovery_run_id="run-1",
@@ -291,7 +310,7 @@ def test_apply_changes_skips_idempotent_existing_added_version():
 
 
 def test_apply_changes_raises_on_current_active_conflict_and_rolls_back():
-    canonical = canonicalize_spot_report({"raw_payload": {"spot": {"name": "New"}}}, "new")
+    canonical = canonicalize_spot_report(raw_spot("New", "new"), "new")
     added = build_added_spot_version_row(
         canonical_spot=canonical,
         discovery_run_id="run-1",
@@ -326,9 +345,94 @@ def test_process_discovery_run_returns_for_missing_or_complete_runs(monkeypatch)
     )
 
 
+def test_process_discovery_run_completes_when_success_count_matches(monkeypatch):
+    monkeypatch.setenv("DATA_BUCKET", "bucket")
+    monkeypatch.setenv("SUPABASE_POSTGRES_URL_PARAMETER_NAME", "param")
+    applied = []
+
+    @contextmanager
+    def fake_connect(parameter_name):
+        yield "conn"
+
+    def fake_build_added_rows(**kwargs):
+        return [{"spot_id": item["spot_id"]} for item in kwargs["success_items"]]
+
+    monkeypatch.setattr(
+        "discovery_spot_batch_processor.handler._get_json",
+        lambda *_: {"removed_spot_ids": [], "sitemap_raw_key": "raw/sitemap.json.gz"},
+    )
+    monkeypatch.setattr("discovery_spot_batch_processor.handler.build_added_rows", fake_build_added_rows)
+    monkeypatch.setattr("discovery_spot_batch_processor.handler.connect", fake_connect)
+    monkeypatch.setattr(
+        "discovery_spot_batch_processor.handler.apply_spot_version_changes",
+        lambda **kwargs: applied.append(kwargs),
+    )
+    store = FakeStore(
+        run={
+            "status": "spot_processing",
+            "planner_manifest_key": "control/manifest.json",
+            "success_scrape_count": 2,
+        },
+        spots=[
+            {"spot_id": "a", "terminal_status": "success", "raw_key": "raw/a.json.gz"},
+            {"spot_id": "b", "terminal_status": "success", "raw_key": "raw/b.json.gz"},
+            {"spot_id": "c", "terminal_status": "failed"},
+        ],
+    )
+
+    assert process_discovery_run("run-1", store=store) == "processed"
+
+    assert store.completed == ["run-1"]
+    assert len(applied) == 1
+    assert [row["spot_id"] for row in applied[0]["added_rows"]] == ["a", "b"]
+
+
+def test_process_discovery_run_raises_when_loaded_success_count_mismatches_run_summary(monkeypatch):
+    monkeypatch.setenv("DATA_BUCKET", "bucket")
+    monkeypatch.setattr(
+        "discovery_spot_batch_processor.handler._get_json",
+        lambda *_: {"removed_spot_ids": [], "sitemap_raw_key": "raw/sitemap.json.gz"},
+    )
+    store = FakeStore(
+        run={
+            "status": "spot_processing",
+            "planner_manifest_key": "control/manifest.json",
+            "success_scrape_count": 9062,
+        },
+        spots=[{"spot_id": "a", "terminal_status": "success", "raw_key": "raw/a.json.gz"}],
+    )
+
+    with pytest.raises(RuntimeError, match="Success spot count mismatch"):
+        process_discovery_run("run-1", store=store)
+
+    assert store.completed == []
+
+
+def test_process_discovery_run_raises_when_built_row_count_mismatches_success_items(monkeypatch):
+    monkeypatch.setenv("DATA_BUCKET", "bucket")
+    monkeypatch.setattr(
+        "discovery_spot_batch_processor.handler._get_json",
+        lambda *_: {"removed_spot_ids": [], "sitemap_raw_key": "raw/sitemap.json.gz"},
+    )
+    monkeypatch.setattr("discovery_spot_batch_processor.handler.build_added_rows", lambda **_: [])
+    store = FakeStore(
+        run={
+            "status": "spot_processing",
+            "planner_manifest_key": "control/manifest.json",
+            "success_scrape_count": 1,
+        },
+        spots=[{"spot_id": "a", "terminal_status": "success", "raw_key": "raw/a.json.gz"}],
+    )
+
+    with pytest.raises(RuntimeError, match="Added row count mismatch"):
+        process_discovery_run("run-1", store=store)
+
+    assert store.completed == []
+
+
 def test_apply_changes_closes_current_removed_tombstone_when_spot_is_readded():
     canonical = canonicalize_spot_report(
-        {"raw_payload": {"spot": {"name": "Readded Spot"}}},
+        raw_spot("Readded Spot", "readded"),
         "readded",
     )
     added = build_added_spot_version_row(
@@ -380,7 +484,7 @@ def test_apply_changes_closes_current_removed_tombstone_when_spot_is_readded():
 
 def test_apply_changes_skips_insert_when_current_added_version_already_exists():
     canonical = canonicalize_spot_report(
-        {"raw_payload": {"spot": {"name": "Existing"}}},
+        raw_spot("Existing", "existing"),
         "existing",
     )
     added = build_added_spot_version_row(

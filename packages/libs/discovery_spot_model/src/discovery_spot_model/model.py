@@ -4,7 +4,17 @@ from copy import deepcopy
 from typing import Any
 
 SCHEMA_VERSION = 1
-JSON_FIELDS = {"breadcrumbs", "cameras", "ability_levels", "board_types", "travel_details"}
+JSON_FIELDS = {"breadcrumbs", "travel_details"}
+REQUIRED_SPOT_FIELDS = (
+    "spot_id",
+    "name",
+    "lat",
+    "lon",
+    "timezone",
+    "utc_offset",
+    "abbr_timezone",
+    "href",
+)
 
 
 def _sha256(value: str) -> str:
@@ -60,26 +70,23 @@ def _norm(value: Any) -> Any:
 def canonicalize_spot_report(raw_payload: dict[str, Any], spot_id: str) -> dict[str, Any]:
     spot = _first_mapping(raw_payload)
     location = spot.get("location") or {}
-    bread = spot.get("breadCrumbs") or spot.get("breadcrumbs") or []
-    subregion = spot.get("subregion") or {}
-    return {
-        "spot_id": spot_id,
+    canonical = {
+        "spot_id": spot.get("spot_id") or spot.get("_id"),
         "name": spot.get("name"),
-        "lat": location.get("lat") or spot.get("lat"),
-        "lon": location.get("lon") or spot.get("lon"),
+        "lat": location.get("lat") if location.get("lat") is not None else spot.get("lat"),
+        "lon": location.get("lon") if location.get("lon") is not None else spot.get("lon"),
         "timezone": spot.get("timezone"),
-        "utc_offset": spot.get("utcOffset"),
-        "abbr_timezone": spot.get("abbrTimezone"),
-        "subregion_id": subregion.get("_id") or spot.get("subregionId"),
-        "subregion_name": subregion.get("name"),
-        "sitemap_link": spot.get("sitemapLink") or spot.get("sitemap_link"),
-        "forecast_link": spot.get("forecastLink") or spot.get("forecast_link"),
-        "breadcrumbs": _norm(bread) or [],
-        "cameras": _norm(spot.get("cameras") or []),
-        "ability_levels": _norm(spot.get("abilityLevels") or spot.get("ability_levels") or []),
-        "board_types": _norm(spot.get("boardTypes") or spot.get("board_types") or []),
+        "utc_offset": spot.get("utc_offset") if spot.get("utc_offset") is not None else spot.get("utcOffset"),
+        "abbr_timezone": spot.get("abbr_timezone") or spot.get("abbrTimezone"),
+        "href": spot.get("href") or spot.get("sitemapLink") or spot.get("sitemap_link"),
+        "breadcrumbs": _norm(spot.get("breadCrumbs") or spot.get("breadcrumbs") or []),
+        "subregion": _norm(spot.get("subregion") or {}),
         "travel_details": _norm(spot.get("travelDetails") or spot.get("travel_details") or {}),
     }
+    missing = [field for field in REQUIRED_SPOT_FIELDS if canonical.get(field) is None]
+    if missing:
+        raise ValueError(f"Missing required spot fields for {spot_id}: {', '.join(missing)}")
+    return canonical
 
 
 def compute_spot_checksum(canonical_spot: dict[str, Any]) -> str:
@@ -130,11 +137,9 @@ def build_removed_tombstone_row(
             "timezone",
             "utc_offset",
             "abbr_timezone",
-            "subregion_id",
-            "subregion_name",
-            "sitemap_link",
-            "forecast_link",
+            "href",
             *JSON_FIELDS,
+            "subregion",
         ]
     }
     row.update(

@@ -60,13 +60,7 @@ class InMemoryCursor:
     def _insert(self, sql, params):
         cols = sql.split("(", 1)[1].split(")", 1)[0].split(",")
         row = dict(zip(cols, params))
-        for col in [
-            "breadcrumbs",
-            "cameras",
-            "ability_levels",
-            "board_types",
-            "travel_details",
-        ]:
+        for col in ["breadcrumbs", "subregion", "travel_details"]:
             if isinstance(row.get(col), str):
                 row[col] = json.loads(row[col])
         if not any(existing["spot_version_id"] == row["spot_version_id"] for existing in self.db):
@@ -144,7 +138,20 @@ def test_batch_processor_happy_path_adds_successes_removes_tombstones_and_marks_
         s3,
         bucket,
         raw_key,
-        {"raw_payload": {"spot": {"name": "New Spot", "location": {"lat": 1, "lon": 2}}}},
+        {
+            "raw_payload": {
+                "spot": {
+                    "spot_id": "new",
+                    "name": "New Spot",
+                    "lat": 1,
+                    "lon": 2,
+                    "timezone": "Europe/London",
+                    "utc_offset": 0,
+                    "abbr_timezone": "GMT",
+                    "href": "https://example.com/new",
+                }
+            }
+        },
     )
     store = _store()
     store.seed_run(
@@ -225,7 +232,25 @@ def test_batch_processor_conflict_rolls_back_and_does_not_mark_complete(
     raw_key = (
         "raw/spot_report/scrape_date=2026-05-01/discovery_run_id=run-conflict/spot_id=new.json.gz"
     )
-    _put_gzip_json(s3, bucket, raw_key, {"raw_payload": {"spot": {"name": "New Spot"}}})
+    _put_gzip_json(
+        s3,
+        bucket,
+        raw_key,
+        {
+            "raw_payload": {
+                "spot": {
+                    "spot_id": "new",
+                    "name": "New Spot",
+                    "lat": 1,
+                    "lon": 2,
+                    "timezone": "Europe/London",
+                    "utc_offset": 0,
+                    "abbr_timezone": "GMT",
+                    "href": "https://example.com/new",
+                }
+            }
+        },
+    )
     store = _store()
     store.seed_run(
         discovery_run_id="run-conflict",

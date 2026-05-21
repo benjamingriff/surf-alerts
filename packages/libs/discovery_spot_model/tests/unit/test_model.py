@@ -13,6 +13,31 @@ from discovery_spot_model import (
 )
 
 
+REST_BAY_SPOT = {
+    "spot_id": "584204204e65fad6a77090d2",
+    "name": "Rest Bay",
+    "lat": 51.488,
+    "lon": -3.728,
+    "timezone": "Europe/London",
+    "utc_offset": 1,
+    "abbr_timezone": "BST",
+    "href": "https://www.surfline.com/surf-report/rest-bay/584204204e65fad6a77090d2",
+    "breadcrumbs": [
+        {"name": "United Kingdom", "href": "https://www.surfline.com/uk"},
+        {"name": "Wales", "href": "https://www.surfline.com/wales"},
+    ],
+    "subregion": {
+        "_id": "612801eb3f4e20988f77c71f",
+        "forecastStatus": "active",
+        "name": "Severn Estuary",
+    },
+    "cameras": [{"id": "cam-1"}],
+    "ability_levels": ["BEGINNER"],
+    "board_types": ["SHORTBOARD"],
+    "travel_details": {"best_season": ["Autumn", "Winter"], "spot_rating": 5},
+}
+
+
 def test_deterministic_run_id_is_day_scoped_sha256():
     expected = hashlib.sha256("discovery:2026-05-01".encode()).hexdigest()
     assert deterministic_discovery_run_id("2026-05-01") == expected
@@ -39,22 +64,47 @@ def test_deterministic_removed_version_id_uses_spot_run_and_removed_marker():
     )
 
 
-def test_canonicalize_spot_report_flattens_representative_surfline_payload():
+def test_canonicalize_spot_report_flattens_current_spot_scraper_payload_shape():
+    canonical = canonicalize_spot_report({"spot": REST_BAY_SPOT}, REST_BAY_SPOT["spot_id"])
+
+    assert canonical == {
+        "spot_id": "584204204e65fad6a77090d2",
+        "name": "Rest Bay",
+        "lat": 51.488,
+        "lon": -3.728,
+        "timezone": "Europe/London",
+        "utc_offset": 1,
+        "abbr_timezone": "BST",
+        "href": "https://www.surfline.com/surf-report/rest-bay/584204204e65fad6a77090d2",
+        "breadcrumbs": [
+            {"href": "https://www.surfline.com/uk", "name": "United Kingdom"},
+            {"href": "https://www.surfline.com/wales", "name": "Wales"},
+        ],
+        "subregion": {
+            "_id": "612801eb3f4e20988f77c71f",
+            "forecastStatus": "active",
+            "name": "Severn Estuary",
+        },
+        "travel_details": {"best_season": ["Autumn", "Winter"], "spot_rating": 5},
+    }
+    assert "cameras" not in canonical
+    assert "ability_levels" not in canonical
+    assert "board_types" not in canonical
+
+
+def test_canonicalize_spot_report_still_accepts_raw_surfline_camel_case_fields():
     raw = {
         "raw_payload": {
             "spot": {
+                "_id": "spot-a",
                 "name": "Bundoran",
                 "location": {"lat": 54.477, "lon": -8.28},
                 "timezone": "Europe/Dublin",
                 "utcOffset": 0,
                 "abbrTimezone": "GMT",
-                "subregion": {"_id": "sub-1", "name": "Donegal"},
-                "sitemapLink": "/surf-report/bundoran/spot-a",
-                "forecastLink": "/surf-forecasts/bundoran/spot-a",
+                "href": "/surf-report/bundoran/spot-a",
                 "breadCrumbs": [{"name": "Ireland", "href": "/ireland"}],
-                "cameras": [{"id": "cam-1", "title": "Main"}],
-                "abilityLevels": ["INTERMEDIATE", "BEGINNER"],
-                "boardTypes": [{"name": "Shortboard"}],
+                "subregion": {"_id": "sub-1", "name": "Donegal"},
                 "travelDetails": {"best": {"season": "winter"}},
             }
         }
@@ -62,57 +112,32 @@ def test_canonicalize_spot_report_flattens_representative_surfline_payload():
 
     canonical = canonicalize_spot_report(raw, "spot-a")
 
-    assert canonical == {
-        "spot_id": "spot-a",
-        "name": "Bundoran",
-        "lat": 54.477,
-        "lon": -8.28,
-        "timezone": "Europe/Dublin",
-        "utc_offset": 0,
-        "abbr_timezone": "GMT",
-        "subregion_id": "sub-1",
-        "subregion_name": "Donegal",
-        "sitemap_link": "/surf-report/bundoran/spot-a",
-        "forecast_link": "/surf-forecasts/bundoran/spot-a",
-        "breadcrumbs": [{"href": "/ireland", "name": "Ireland"}],
-        "cameras": [{"id": "cam-1", "title": "Main"}],
-        "ability_levels": ["BEGINNER", "INTERMEDIATE"],
-        "board_types": [{"name": "Shortboard"}],
-        "travel_details": {"best": {"season": "winter"}},
-    }
-
-
-def test_canonicalize_spot_report_handles_missing_optional_fields():
-    canonical = canonicalize_spot_report({"raw_payload": {"spot": {"name": "Minimal"}}}, "spot-min")
-
-    assert canonical["spot_id"] == "spot-min"
-    assert canonical["name"] == "Minimal"
-    assert canonical["lat"] is None
-    assert canonical["lon"] is None
-    assert canonical["breadcrumbs"] == []
-    assert canonical["cameras"] == []
-    assert canonical["ability_levels"] == []
-    assert canonical["board_types"] == []
-    assert canonical["travel_details"] == {}
-
-
-def test_canonicalize_spot_report_handles_unexpected_raw_payload_type_as_empty_spot():
-    canonical = canonicalize_spot_report({"raw_payload": ["not", "a", "dict"]}, "spot-a")
-
     assert canonical["spot_id"] == "spot-a"
-    assert canonical["name"] is None
-    assert canonical["breadcrumbs"] == []
+    assert canonical["utc_offset"] == 0
+    assert canonical["abbr_timezone"] == "GMT"
+    assert canonical["href"] == "/surf-report/bundoran/spot-a"
+    assert canonical["breadcrumbs"] == [{"href": "/ireland", "name": "Ireland"}]
+
+
+def test_canonicalize_spot_report_raises_when_required_fields_are_missing():
+    with pytest.raises(ValueError, match="Missing required spot fields"):
+        canonicalize_spot_report({"raw_payload": {"spot": {"name": "Minimal"}}}, "spot-min")
+
+
+def test_canonicalize_spot_report_handles_unexpected_raw_payload_type_as_missing_required_fields():
+    with pytest.raises(ValueError, match="Missing required spot fields"):
+        canonicalize_spot_report({"raw_payload": ["not", "a", "dict"]}, "spot-a")
 
 
 def test_compute_checksum_is_stable_for_nested_key_and_array_order():
     a = {
         "spot_id": "spot-a",
-        "board_types": [{"b": 2, "a": 1}, {"name": "Fish"}],
+        "breadcrumbs": [{"b": 2, "a": 1}, {"name": "Wales"}],
         "travel_details": {"z": 1, "a": 2},
     }
     b = {
         "travel_details": {"a": 2, "z": 1},
-        "board_types": [{"name": "Fish"}, {"a": 1, "b": 2}],
+        "breadcrumbs": [{"name": "Wales"}, {"a": 1, "b": 2}],
         "spot_id": "spot-a",
     }
 
@@ -122,7 +147,7 @@ def test_compute_checksum_is_stable_for_nested_key_and_array_order():
         == hashlib.sha256(
             json.dumps(
                 {
-                    "board_types": [{"a": 1, "b": 2}, {"name": "Fish"}],
+                    "breadcrumbs": [{"a": 1, "b": 2}, {"name": "Wales"}],
                     "spot_id": "spot-a",
                     "travel_details": {"a": 2, "z": 1},
                 },
@@ -134,7 +159,7 @@ def test_compute_checksum_is_stable_for_nested_key_and_array_order():
 
 
 def test_build_added_spot_version_row_includes_scd2_and_source_fields():
-    canonical = canonicalize_spot_report({"raw_payload": {"spot": {"name": "A"}}}, "spot-a")
+    canonical = canonicalize_spot_report({"spot": REST_BAY_SPOT}, REST_BAY_SPOT["spot_id"])
 
     row = build_added_spot_version_row(
         canonical_spot=canonical,
@@ -144,7 +169,9 @@ def test_build_added_spot_version_row_includes_scd2_and_source_fields():
     )
 
     checksum = compute_spot_checksum(canonical)
-    assert row["spot_version_id"] == deterministic_spot_version_id("spot-a", checksum)
+    assert row["spot_version_id"] == deterministic_spot_version_id(
+        REST_BAY_SPOT["spot_id"], checksum
+    )
     assert row["event_type"] == "added"
     assert row["is_current"] is True
     assert row["valid_to"] is None
@@ -173,7 +200,11 @@ def test_build_removed_tombstone_row_carries_forward_descriptive_fields():
         "lat": 1.0,
         "lon": 2.0,
         "timezone": "Europe/London",
+        "utc_offset": 0,
+        "abbr_timezone": "GMT",
+        "href": "/surf-report/old/spot-a",
         "breadcrumbs": [{"name": "UK"}],
+        "subregion": {"_id": "sub-1", "name": "Region"},
         "travel_details": {"access": "walk"},
     }
 
@@ -191,6 +222,7 @@ def test_build_removed_tombstone_row_carries_forward_descriptive_fields():
     assert row["is_current"] is True
     assert row["valid_to"] is None
     assert row["name"] == "Old Spot"
+    assert row["href"] == "/surf-report/old/spot-a"
     assert row["content_checksum"] == "old-checksum"
     assert row["breadcrumbs"] == [{"name": "UK"}]
     assert row["source_type"] == "sitemap"

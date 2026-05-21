@@ -34,21 +34,16 @@ COLUMNS = [
     "timezone",
     "utc_offset",
     "abbr_timezone",
-    "subregion_id",
-    "subregion_name",
-    "sitemap_link",
-    "forecast_link",
+    "href",
     "breadcrumbs",
-    "cameras",
-    "ability_levels",
-    "board_types",
+    "subregion",
     "travel_details",
     "source_run_id",
     "source_raw_key",
     "source_type",
     "schema_version",
 ]
-JSON_COLUMNS = {"breadcrumbs", "cameras", "ability_levels", "board_types", "travel_details"}
+JSON_COLUMNS = {"breadcrumbs", "subregion", "travel_details"}
 DEFAULT_S3_READ_WORKERS = 16
 
 
@@ -273,9 +268,22 @@ def process_discovery_run(run_id: str, *, store: ControlStore | None = None) -> 
     valid_from = _utc_now_iso()
     manifest = _get_json(bucket, run["planner_manifest_key"])
     success_items = store.list_spots(run_id, terminal_status=SPOT_STATUS_SUCCESS)
+    expected_success_count = run.get("success_scrape_count")
+    if expected_success_count is not None and len(success_items) != int(expected_success_count):
+        raise RuntimeError(
+            f"Success spot count mismatch for {run_id}: "
+            f"loaded {len(success_items)} successful spots, "
+            f"expected {expected_success_count} from run summary"
+        )
+
     added_rows = build_added_rows(
         bucket=bucket, run_id=run_id, success_items=success_items, valid_from=valid_from
     )
+    if len(added_rows) != len(success_items):
+        raise RuntimeError(
+            f"Added row count mismatch for {run_id}: "
+            f"built {len(added_rows)} rows from {len(success_items)} successful spots"
+        )
 
     with connect(os.environ["SUPABASE_POSTGRES_URL_PARAMETER_NAME"]) as conn:
         apply_spot_version_changes(
