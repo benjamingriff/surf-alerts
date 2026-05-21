@@ -193,7 +193,7 @@ export class InfrastructureStack extends cdk.Stack {
           "Dockerfile",
         ),
         timeout: 900,
-        memorySize: 2048,
+        memorySize: 1024,
         environment: {
           DATA_BUCKET: dataBucket.bucketName,
           DISCOVERY_CONTROL_TABLE_NAME: discoveryControlTable.tableName,
