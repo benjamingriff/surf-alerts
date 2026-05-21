@@ -231,10 +231,20 @@ class ControlStore:
     def list_spots(
         self, discovery_run_id: str, terminal_status: str | None = None
     ) -> list[dict[str, Any]]:
-        items = self.table.query(
-            KeyConditionExpression=Key("pk").eq(f"RUN#{discovery_run_id}")
+        items: list[dict[str, Any]] = []
+        query_kwargs: dict[str, Any] = {
+            "KeyConditionExpression": Key("pk").eq(f"RUN#{discovery_run_id}")
             & Key("sk").begins_with("SPOT#")
-        ).get("Items", [])
+        }
+
+        while True:
+            response = self.table.query(**query_kwargs)
+            items.extend(response.get("Items", []))
+            last_evaluated_key = response.get("LastEvaluatedKey")
+            if not last_evaluated_key:
+                break
+            query_kwargs["ExclusiveStartKey"] = last_evaluated_key
+
         if terminal_status:
             items = [i for i in items if i.get("terminal_status") == terminal_status]
         return sorted(items, key=lambda i: i["spot_id"])
