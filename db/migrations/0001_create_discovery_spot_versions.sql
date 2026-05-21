@@ -12,20 +12,29 @@ create table if not exists discovery_spot_versions (
   timezone text null,
   utc_offset integer null,
   abbr_timezone text null,
-  subregion_id text null,
-  subregion_name text null,
-  sitemap_link text null,
-  forecast_link text null,
+  href text null,
   breadcrumbs jsonb null,
-  cameras jsonb null,
-  ability_levels jsonb null,
-  board_types jsonb null,
+  subregion jsonb null,
   travel_details jsonb null,
   source_run_id text not null,
   source_raw_key text not null,
   source_type text not null check (source_type in ('sitemap', 'spot_report')),
-  schema_version integer not null,
-  created_at timestamptz not null default now()
+  schema_version integer not null default 1,
+  created_at timestamptz not null default now(),
+
+  constraint discovery_spot_versions_required_added_fields check (
+    event_type = 'removed'
+    or (
+      spot_id is not null
+      and name is not null
+      and lat is not null
+      and lon is not null
+      and timezone is not null
+      and utc_offset is not null
+      and abbr_timezone is not null
+      and href is not null
+    )
+  )
 );
 
 create unique index if not exists discovery_spot_versions_one_current_per_spot
