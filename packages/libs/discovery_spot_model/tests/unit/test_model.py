@@ -92,6 +92,38 @@ def test_canonicalize_spot_report_flattens_current_spot_scraper_payload_shape():
     assert "board_types" not in canonical
 
 
+def test_canonicalize_spot_report_uses_associated_metadata_from_raw_scraper_envelope():
+    raw = {
+        "raw_payload": {
+            "associated": {
+                "href": "https://www.surfline.com/surf-report/south-ocean-beach/spot-a",
+                "utcOffset": -7,
+                "abbrTimezone": "PDT",
+                "timezone": "America/Los_Angeles",
+            },
+            "spot": {
+                "_id": "spot-a",
+                "name": "South Ocean Beach",
+                "breadcrumb": [{"name": "United States", "href": "/united-states"}],
+                "lat": 37.741668,
+                "lon": -122.51038,
+                "subregion": {"_id": "sub-1", "name": "San Francisco"},
+                "travelDetails": {"access": "Public parking"},
+            },
+        }
+    }
+
+    canonical = canonicalize_spot_report(raw, "spot-a")
+
+    assert canonical["spot_id"] == "spot-a"
+    assert canonical["name"] == "South Ocean Beach"
+    assert canonical["timezone"] == "America/Los_Angeles"
+    assert canonical["utc_offset"] == -7
+    assert canonical["abbr_timezone"] == "PDT"
+    assert canonical["href"] == "https://www.surfline.com/surf-report/south-ocean-beach/spot-a"
+    assert canonical["breadcrumbs"] == [{"href": "/united-states", "name": "United States"}]
+
+
 def test_canonicalize_spot_report_still_accepts_raw_surfline_camel_case_fields():
     raw = {
         "raw_payload": {

@@ -41,16 +41,16 @@ def deterministic_spot_version_id(
     return _sha256(f"{spot_id}:{content_checksum}")
 
 
-def _first_mapping(payload: dict[str, Any]) -> dict[str, Any]:
+def _raw_mapping(payload: dict[str, Any]) -> dict[str, Any]:
     raw = payload.get("raw_payload", payload)
-    if isinstance(raw, dict):
-        return (
-            raw.get("spot")
-            or raw.get("data", {}).get("spot")
-            or raw.get("associated", {}).get("spot")
-            or raw
-        )
-    return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _first_mapping(payload: dict[str, Any]) -> dict[str, Any]:
+    raw = _raw_mapping(payload)
+    if not raw:
+        return {}
+    return raw.get("spot") or raw.get("data", {}).get("spot") or raw
 
 
 def _norm(value: Any) -> Any:
@@ -68,18 +68,22 @@ def _norm(value: Any) -> Any:
 
 
 def canonicalize_spot_report(raw_payload: dict[str, Any], spot_id: str) -> dict[str, Any]:
+    raw = _raw_mapping(raw_payload)
     spot = _first_mapping(raw_payload)
+    associated = raw.get("associated") or {}
     location = spot.get("location") or {}
     canonical = {
         "spot_id": spot.get("spot_id") or spot.get("_id"),
         "name": spot.get("name"),
         "lat": location.get("lat") if location.get("lat") is not None else spot.get("lat"),
         "lon": location.get("lon") if location.get("lon") is not None else spot.get("lon"),
-        "timezone": spot.get("timezone"),
-        "utc_offset": spot.get("utc_offset") if spot.get("utc_offset") is not None else spot.get("utcOffset"),
-        "abbr_timezone": spot.get("abbr_timezone") or spot.get("abbrTimezone"),
-        "href": spot.get("href") or spot.get("sitemapLink") or spot.get("sitemap_link"),
-        "breadcrumbs": _norm(spot.get("breadCrumbs") or spot.get("breadcrumbs") or []),
+        "timezone": spot.get("timezone") or associated.get("timezone"),
+        "utc_offset": spot.get("utc_offset") if spot.get("utc_offset") is not None else spot.get("utcOffset") if spot.get("utcOffset") is not None else associated.get("utcOffset"),
+        "abbr_timezone": spot.get("abbr_timezone") or spot.get("abbrTimezone") or associated.get("abbrTimezone"),
+        "href": spot.get("href") or associated.get("href") or spot.get("sitemapLink") or spot.get("sitemap_link"),
+        "breadcrumbs": _norm(
+            spot.get("breadCrumbs") or spot.get("breadcrumbs") or spot.get("breadcrumb") or []
+        ),
         "subregion": _norm(spot.get("subregion") or {}),
         "travel_details": _norm(spot.get("travelDetails") or spot.get("travel_details") or {}),
     }
