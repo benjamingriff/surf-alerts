@@ -2,7 +2,7 @@
 
 > **Status: PLANNED** | Historical forecast table definitions for the layered forecast pipeline
 
-This page defines the forecast historical tables stored under `processed/forecast/history/`.
+This page defines the forecast historical tables stored under `processed/forecast/history/`. Weather and sunlight source endpoints are documented for reference but are intentionally not collected or stored in v1 because they are not surf-condition inputs for this project.
 
 These tables are the warehouse-oriented history layer behind the forecast pipeline. For the broader bucket layout and batch model, see [Storage Layout](storage-layout.md) and [Forecast Pipeline](forecast-pipeline.md).
 
@@ -47,17 +47,7 @@ These tables are the warehouse-oriented history layer behind the forecast pipeli
                 │ ...         │
                 └─────────────┘
 
-                ┌─────────────┐
-                │dim_sunlight │
-                │─────────────│
-                │ spot_id     │
-                │ date        │
-                │ scrape_ts   │
-                │ dawn        │
-                │ sunrise     │
-                │ sunset      │
-                │ dusk        │
-                └─────────────┘
+                Sunlight and weather tables are intentionally omitted in v1.
 ```
 
 ---
@@ -143,9 +133,9 @@ Recommended joins:
 | direction_min | FLOAT64 | wave.data.wave[].swells[i].directionMin | |
 | optimal_score | INT32 | wave.data.wave[].swells[i].optimalScore | |
 
-**Row count per scrape:** ~240 (after filtering zero-height swells)
-- Original: 120 wave entries * 6 swells = 720 rows
-- Many swells have height=0 (inactive), filtered during ETL
+**Row count per scrape:** 720
+- 120 wave entries * 6 swells = 720 rows
+- Zero-height swells are retained because inactive swell slots may be useful for later analytics
 
 ---
 
@@ -172,18 +162,7 @@ Recommended joins:
 
 ### fact_weather
 
-| Column | Type | Source Path | Notes |
-|--------|------|-------------|-------|
-| spot_id | STRING | metadata.spot_id | |
-| forecast_ts | TIMESTAMP | weather.data.weather[].timestamp | |
-| scrape_ts | TIMESTAMP | metadata.timestamp | |
-| temperature | FLOAT64 | weather.data.weather[].temperature | Celsius |
-| condition | STRING | weather.data.weather[].condition | Enum string |
-| pressure | INT32 | weather.data.weather[].pressure | Millibars |
-| utc_offset | INT32 | weather.data.weather[].utcOffset | |
-| run_init_ts | TIMESTAMP | weather.associated.runInitializationTimestamp | |
-
-**Row count per scrape:** 384 (hourly for 16 days)
+Weather is intentionally not collected or stored in v1 because it is not a surf-condition input for this project. The weather endpoint can be added later if alerting/scoring requirements change.
 
 ---
 
@@ -210,23 +189,7 @@ Recommended joins:
 
 ### dim_sunlight
 
-| Column | Type | Source Path | Notes |
-|--------|------|-------------|-------|
-| spot_id | STRING | metadata.spot_id | |
-| date | DATE | Derived from midnight | YYYY-MM-DD |
-| scrape_ts | TIMESTAMP | metadata.timestamp | |
-| midnight | TIMESTAMP | sunlight.data.sunlight[].midnight | |
-| midnight_utc_offset | INT32 | sunlight.data.sunlight[].midnightUTCOffset | |
-| dawn | TIMESTAMP | sunlight.data.sunlight[].dawn | |
-| dawn_utc_offset | INT32 | sunlight.data.sunlight[].dawnUTCOffset | |
-| sunrise | TIMESTAMP | sunlight.data.sunlight[].sunrise | |
-| sunrise_utc_offset | INT32 | sunlight.data.sunlight[].sunriseUTCOffset | |
-| sunset | TIMESTAMP | sunlight.data.sunlight[].sunset | |
-| sunset_utc_offset | INT32 | sunlight.data.sunlight[].sunsetUTCOffset | |
-| dusk | TIMESTAMP | sunlight.data.sunlight[].dusk | |
-| dusk_utc_offset | INT32 | sunlight.data.sunlight[].duskUTCOffset | |
-
-**Row count per scrape:** 16 (daily for 16 days)
+Sunlight is intentionally not collected or stored in v1 because it is not a surf-condition input for this project. The sunlight endpoint can be added later if daylight-aware alerting becomes a requirement.
 
 ---
 
