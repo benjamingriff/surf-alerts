@@ -2,7 +2,7 @@
 
 ## Processed Spot Discovery State
 
-The canonical, queryable representation of Surfline spot discovery after raw payloads have been interpreted. This includes the current spot catalog and historical spot versions. In this project, processed spot discovery state lives in Supabase/Postgres.
+The canonical, queryable representation of Surfline spot discovery after raw payloads have been interpreted. This includes the current spot catalog and historical spot versions. In this project, processed spot discovery state lives in Supabase/Postgres and is the source for selecting live spots due for forecast scraping.
 
 ## Spot Lifecycle Event
 
@@ -22,7 +22,7 @@ An explicit message emitted by a scraper after it reaches a terminal outcome. A 
 
 ## Pipeline Control State
 
-Temporary orchestration state used to make pipeline execution idempotent and observable, such as discovery runs, expected spot counts, scrape completions, planner manifests, and scrape failures. Pipeline control state is not business spot state.
+Temporary orchestration state used to make pipeline execution idempotent and observable, such as discovery runs, forecast runs, expected scrape counts, scrape completions, processing completions, planner manifests, and failures. Pipeline control state is not business spot state.
 
 ## Planner Manifest
 
@@ -34,8 +34,20 @@ A terminal scrape outcome where no usable raw payload was produced and no proces
 
 ## Terminal Scrape Outcome
 
-The final recorded outcome for one planned scrape attempt. For the first implementation, terminal scrape outcomes are `success` and `failed`. A success means the raw S3 object exists and its key is recorded; a failure means no usable raw object exists and a failure reason is recorded. Both outcomes count toward discovery run scrape completion.
+The final recorded outcome for one planned scrape attempt. Terminal scrape outcomes are `success` and `failed`. A success means the raw S3 object exists and its key is recorded; a failure means no usable raw object exists and a failure reason is recorded. Both outcomes count toward run completion.
 
 ## Discovery Run
 
 One scheduled sitemap scrape and all downstream work needed to reconcile processed spot discovery state from that sitemap. A discovery run can complete even if some individual spot scrapes fail; those failures belong to pipeline control state, not processed spot discovery state. Spot report processing happens as a batch after the run's expected spot scrapes have all reached a terminal scrape outcome.
+
+## Forecast Run
+
+All live spots whose stored UTC offset makes them due for forecast scraping at one configured local scrape time. Forecast runs are offset-selected for operational efficiency; IANA timezones remain descriptive spot metadata rather than the scheduling authority. A forecast run is identified deterministically from its UTC offset, UTC scrape date, and scheduled local time so repeated scheduler attempts refer to the same work.
+
+## Scrape Date
+
+The UTC calendar date on which scraper work is scheduled or collected. Scrape date is process metadata and is not the local surf date for a spot or forecast run.
+
+## Forecast Run Planner
+
+The pipeline role that creates a forecast run and its expected spot scrape membership. A forecast run planner belongs to pipeline control state and does not create forecast facts.
