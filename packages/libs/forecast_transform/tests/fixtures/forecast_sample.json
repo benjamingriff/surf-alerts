@@ -1,0 +1,113 @@
+{
+  "rating": {
+    "associated": {
+      "location": {"lon": -3.728, "lat": 51.488},
+      "runInitializationTimestamp": 1779753600
+    },
+    "data": {
+      "rating": [
+        {
+          "timestamp": 1779750000,
+          "utcOffset": 1,
+          "rating": {"key": "POOR_TO_FAIR", "value": 2.3333333333333335}
+        }
+      ]
+    }
+  },
+  "tides": {
+    "associated": {
+      "utcOffset": 1,
+      "units": {"tideHeight": "FT"},
+      "tideLocation": {
+        "name": "Port Talbot",
+        "min": -0.62,
+        "max": 36.32,
+        "lon": -3.783,
+        "lat": 51.6,
+        "mean": 0
+      }
+    },
+    "data": {
+      "tides": [
+        {"timestamp": 1779750000, "utcOffset": 1, "type": "NORMAL", "height": 17.24},
+        {"timestamp": 1779753600, "utcOffset": 1, "type": "HIGH", "height": 21.53},
+        {"timestamp": 1779757200, "utcOffset": 1, "type": "LOW", "height": 13.1}
+      ]
+    }
+  },
+  "wave": {
+    "associated": {
+      "units": {"swellHeight": "FT", "waveHeight": "FT"},
+      "utcOffset": 1,
+      "location": {"lon": -3.728, "lat": 51.488},
+      "forecastLocation": {"lon": -3.739, "lat": 51.473},
+      "offshoreLocation": {"lon": -4.6, "lat": 51.45},
+      "runInitializationTimestamp": 1779753600
+    },
+    "data": {
+      "wave": [
+        {
+          "timestamp": 1779750000,
+          "probability": 100,
+          "utcOffset": 1,
+          "surf": {
+            "min": 1,
+            "max": 2,
+            "plus": false,
+            "humanRelation": "Knee to thigh",
+            "raw": {"min": 0.78084, "max": 1.61745},
+            "optimalScore": 2
+          },
+          "power": 15.23004,
+          "swells": [
+            {
+              "height": 1.28888,
+              "period": 8,
+              "impact": 0.6627,
+              "power": 14.16969,
+              "direction": 252.93365,
+              "directionMin": 247.995625,
+              "optimalScore": 0
+            },
+            {
+              "height": 0.68911,
+              "period": 6,
+              "impact": 0.3373,
+              "power": 1.06035,
+              "direction": 256.71185,
+              "directionMin": 247.80961500000004,
+              "optimalScore": 0
+            },
+            {"height": 0, "period": 0, "impact": 0, "power": 0, "direction": 0, "directionMin": 0, "optimalScore": 0},
+            {"height": 0, "period": 0, "impact": 0, "power": 0, "direction": 0, "directionMin": 0, "optimalScore": 0},
+            {"height": 0, "period": 0, "impact": 0, "power": 0, "direction": 0, "directionMin": 0, "optimalScore": 0},
+            {"height": 0, "period": 0, "impact": 0, "power": 0, "direction": 0, "directionMin": 0, "optimalScore": 0}
+          ]
+        }
+      ]
+    }
+  },
+  "wind": {
+    "associated": {
+      "units": {"windSpeed": "MPH"},
+      "utcOffset": 1,
+      "location": {"lat": 51.488, "lon": -3.728},
+      "runInitializationTimestamp": 1779753600,
+      "windStation": null,
+      "lastObserved": null
+    },
+    "data": {
+      "wind": [
+        {
+          "timestamp": 1779750000,
+          "utcOffset": 1,
+          "speed": 8.43187,
+          "direction": 69.93409,
+          "directionType": "Offshore",
+          "gust": 8.43187,
+          "optimalScore": 2
+        }
+      ]
+    }
+  }
+}

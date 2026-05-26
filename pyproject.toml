@@ -17,6 +17,7 @@ members = [
     "packages/libs/postgres_client",
     "packages/libs/discovery_control",
     "packages/libs/forecast_control",
+    "packages/libs/forecast_transform",
     "packages/jobs/dispatcher",
     "packages/jobs/spot_reconciler",
     "packages/migrations/archive_legacy_data",
@@ -34,6 +35,7 @@ discovery-run-planner = { workspace = true }
 discovery-spot-batch-processor = { workspace = true }
 discovery-spot-model = { workspace = true }
 forecast-control = { workspace = true }
+forecast-transform = { workspace = true }
 forecast-run-planner = { workspace = true }
 postgres-client = { workspace = true }
 forecast-scraper = { workspace = true }

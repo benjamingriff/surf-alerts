@@ -15,6 +15,7 @@ members = [
     "forecast-control",
     "forecast-run-planner",
     "forecast-scraper",
+    "forecast-transform",
     "postgres-client",
     "sitemap-scraper",
     "spot-reconciler",
@@ -475,6 +476,11 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.42.15" },
     { name = "curl-cffi", specifier = ">=0.14.0" },
 ]
+
+[[package]]
+name = "forecast-transform"
+version = "0.1.0"
+source = { editable = "packages/libs/forecast_transform" }
 
 [[package]]
 name = "h3"
