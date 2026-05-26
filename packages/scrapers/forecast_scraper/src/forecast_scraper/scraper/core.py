@@ -6,10 +6,8 @@ logger = get_logger()
 
 ENDPOINTS = {
     "rating": "https://services.surfline.com/kbyg/spots/forecasts/rating?spotId={}&days=5&intervalHours=1&cacheEnabled=true",
-    "sunlight": "https://services.surfline.com/kbyg/spots/forecasts/sunlight?spotId={}&days=16&intervalHours=1",
-    "tides": "https://services.surfline.com/kbyg/spots/forecasts/tides?spotId={}&days=6&cacheEnabled=true&units[tideHeight]=M",
+    "tides": "https://services.surfline.com/kbyg/spots/forecasts/tides?spotId={}&days=6&cacheEnabled=true&units[tideHeight]=FT",
     "wave": "https://services.surfline.com/kbyg/spots/forecasts/wave?spotId={}&days=5&intervalHours=1&cacheEnabled=true&units[swellHeight]=FT&units[waveHeight]=FT",
-    "weather": "https://services.surfline.com/kbyg/spots/forecasts/weather?spotId={}&days=16&intervalHours=1&cacheEnabled=true&units[temperature]=C",
     "wind": "https://services.surfline.com/kbyg/spots/forecasts/wind?spotId={}&days=5&intervalHours=1&corrected=false&cacheEnabled=true&units[windSpeed]=MPH",
 }
 

@@ -92,9 +92,9 @@ export class InfrastructureStack extends cdk.Stack {
       },
     );
 
-    const forecastScraperQueue = new SqsQueue(this, "ForecastScraperQueue", {
-      queueName: `${projectName}-forecast-scraper-queue`,
-      visibilityTimeout: cdk.Duration.seconds(60 * 6),
+    const forecastCompletionQueue = new SqsQueue(this, "ForecastCompletionQueue", {
+      queueName: `${projectName}-forecast-completion-queue`,
+      visibilityTimeout: cdk.Duration.seconds(1800),
     });
 
     const supabasePostgresUrl =
@@ -148,6 +148,23 @@ export class InfrastructureStack extends cdk.Stack {
       },
     });
 
+    const forecastScraper = new ScraperWorker(this, "ForecastScraperConstruct", {
+      projectName,
+      scraperName: "forecast-scraper",
+      codePath: path.join(
+        codebuildSrcDir,
+        "packages",
+        "scrapers",
+        "forecast_scraper",
+      ),
+      timeout: 60,
+      memorySize: 1024,
+      environment: {
+        DATA_BUCKET: dataBucket.bucketName,
+        FORECAST_COMPLETION_QUEUE_URL: forecastCompletionQueue.queue.queueUrl,
+      },
+    });
+
     const discoveryRunPlanner = new DockerFunction(
       this,
       "DiscoveryRunPlannerConstruct",
@@ -192,7 +209,7 @@ export class InfrastructureStack extends cdk.Stack {
         memorySize: 1024,
         environment: {
           FORECAST_CONTROL_TABLE_NAME: forecastControlTable.tableName,
-          FORECAST_SCRAPER_QUEUE_URL: forecastScraperQueue.queue.queueUrl,
+          FORECAST_SCRAPER_QUEUE_URL: forecastScraper.queue.queueUrl,
           FORECAST_SCRAPE_LOCAL_TIME: "04:00",
           FORECAST_MIN_UTC_OFFSET: "-12",
           FORECAST_MAX_UTC_OFFSET: "14",
@@ -252,6 +269,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     dataBucket.grantReadWrite(sitemapScraper.lambdaFunction);
     dataBucket.grantReadWrite(spotScraper.lambdaFunction);
+    dataBucket.grantReadWrite(forecastScraper.lambdaFunction);
     dataBucket.grantReadWrite(discoveryRunPlanner.lambdaFunction);
     dataBucket.grantReadWrite(discoverySpotBatchProcessor.lambdaFunction);
     discoveryControlTable.grantReadWriteData(
@@ -277,9 +295,8 @@ export class InfrastructureStack extends cdk.Stack {
     discoverySpotBatchProcessorQueue.queue.grantSendMessages(
       discoveryCompletion.lambdaFunction,
     );
-    forecastScraperQueue.queue.grantSendMessages(
-      forecastRunPlanner.lambdaFunction,
-    );
+    forecastScraper.queue.grantSendMessages(forecastRunPlanner.lambdaFunction);
+    forecastCompletionQueue.queue.grantSendMessages(forecastScraper.lambdaFunction);
     supabasePostgresUrl.grantRead(discoveryRunPlanner.lambdaFunction);
     supabasePostgresUrl.grantRead(discoverySpotBatchProcessor.lambdaFunction);
     supabasePostgresUrl.grantRead(forecastRunPlanner.lambdaFunction);
