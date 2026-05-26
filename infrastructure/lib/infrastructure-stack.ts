@@ -2,6 +2,7 @@ import * as cdk from "aws-cdk-lib";
 import * as path from "path";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as events from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as ssm from "aws-cdk-lib/aws-ssm";
@@ -51,6 +52,19 @@ export class InfrastructureStack extends cdk.Stack {
       },
     );
 
+    const forecastControlTable = new dynamodb.Table(
+      this,
+      "ForecastControlTable",
+      {
+        tableName: `${projectName}-forecast-control`,
+        partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+        sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        timeToLiveAttribute: "expires_at",
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+      },
+    );
+
     const discoveryCompletionQueue = new SqsQueue(
       this,
       "DiscoveryCompletionQueue",
@@ -77,6 +91,11 @@ export class InfrastructureStack extends cdk.Stack {
         visibilityTimeout: cdk.Duration.seconds(900 * 6),
       },
     );
+
+    const forecastScraperQueue = new SqsQueue(this, "ForecastScraperQueue", {
+      queueName: `${projectName}-forecast-scraper-queue`,
+      visibilityTimeout: cdk.Duration.seconds(60 * 6),
+    });
 
     const supabasePostgresUrl =
       ssm.StringParameter.fromSecureStringParameterAttributes(
@@ -156,6 +175,33 @@ export class InfrastructureStack extends cdk.Stack {
       },
     );
 
+    const forecastRunPlanner = new DockerFunction(
+      this,
+      "ForecastRunPlannerConstruct",
+      {
+        projectName,
+        functionName: "forecast-run-planner",
+        codePath: codebuildSrcDir,
+        dockerfile: path.join(
+          "packages",
+          "jobs",
+          "forecast_run_planner",
+          "Dockerfile",
+        ),
+        timeout: 300,
+        memorySize: 1024,
+        environment: {
+          FORECAST_CONTROL_TABLE_NAME: forecastControlTable.tableName,
+          FORECAST_SCRAPER_QUEUE_URL: forecastScraperQueue.queue.queueUrl,
+          FORECAST_SCRAPE_LOCAL_TIME: "04:00",
+          FORECAST_MIN_UTC_OFFSET: "-12",
+          FORECAST_MAX_UTC_OFFSET: "14",
+          SUPABASE_POSTGRES_URL_PARAMETER_NAME:
+            "/surf-alerts/supabase/postgres-url",
+        },
+      },
+    );
+
     const discoveryCompletion = new DockerFunction(
       this,
       "DiscoveryCompletionConstruct",
@@ -217,6 +263,7 @@ export class InfrastructureStack extends cdk.Stack {
     discoveryControlTable.grantReadWriteData(
       discoverySpotBatchProcessor.lambdaFunction,
     );
+    forecastControlTable.grantReadWriteData(forecastRunPlanner.lambdaFunction);
     discoveryRunPlannerQueue.queue.grantSendMessages(
       sitemapScraper.lambdaFunction,
     );
@@ -230,8 +277,17 @@ export class InfrastructureStack extends cdk.Stack {
     discoverySpotBatchProcessorQueue.queue.grantSendMessages(
       discoveryCompletion.lambdaFunction,
     );
+    forecastScraperQueue.queue.grantSendMessages(
+      forecastRunPlanner.lambdaFunction,
+    );
     supabasePostgresUrl.grantRead(discoveryRunPlanner.lambdaFunction);
     supabasePostgresUrl.grantRead(discoverySpotBatchProcessor.lambdaFunction);
+    supabasePostgresUrl.grantRead(forecastRunPlanner.lambdaFunction);
+
+    new events.Rule(this, "ForecastRunPlannerHourlyRule", {
+      schedule: events.Schedule.cron({ minute: "0" }),
+      targets: [new targets.LambdaFunction(forecastRunPlanner.lambdaFunction)],
+    });
 
     discoveryRunPlanner.lambdaFunction.addEventSource(
       new lambdaEventSources.SqsEventSource(discoveryRunPlannerQueue.queue, {

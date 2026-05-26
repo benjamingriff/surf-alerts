@@ -12,9 +12,11 @@ members = [
     "packages/jobs/discovery_completion",
     "packages/jobs/discovery_run_planner",
     "packages/jobs/discovery_spot_batch_processor",
+    "packages/jobs/forecast_run_planner",
     "packages/libs/discovery_spot_model",
     "packages/libs/postgres_client",
     "packages/libs/discovery_control",
+    "packages/libs/forecast_control",
     "packages/jobs/dispatcher",
     "packages/jobs/spot_reconciler",
     "packages/migrations/archive_legacy_data",
@@ -31,6 +33,8 @@ discovery-completion = { workspace = true }
 discovery-run-planner = { workspace = true }
 discovery-spot-batch-processor = { workspace = true }
 discovery-spot-model = { workspace = true }
+forecast-control = { workspace = true }
+forecast-run-planner = { workspace = true }
 postgres-client = { workspace = true }
 forecast-scraper = { workspace = true }
 sitemap-scraper = { workspace = true }
