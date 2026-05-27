@@ -28,6 +28,16 @@ export class InfrastructureStack extends cdk.Stack {
       eventBridgeEnabled: false,
       lifecycleRules: [
         {
+          prefix: "raw/forecast/",
+          expiration: cdk.Duration.days(30),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+        },
+        {
+          prefix: "raw/spot_report/",
+          expiration: cdk.Duration.days(90),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+        },
+        {
           prefix: "raw/",
           expiration: cdk.Duration.days(120),
           abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
@@ -93,10 +103,14 @@ export class InfrastructureStack extends cdk.Stack {
       },
     );
 
-    const forecastCompletionQueue = new SqsQueue(this, "ForecastCompletionQueue", {
-      queueName: `${projectName}-forecast-completion-queue`,
-      visibilityTimeout: cdk.Duration.seconds(1800),
-    });
+    const forecastCompletionQueue = new SqsQueue(
+      this,
+      "ForecastCompletionQueue",
+      {
+        queueName: `${projectName}-forecast-completion-queue`,
+        visibilityTimeout: cdk.Duration.seconds(1800),
+      },
+    );
 
     const supabasePostgresUrl =
       ssm.StringParameter.fromSecureStringParameterAttributes(
@@ -149,22 +163,26 @@ export class InfrastructureStack extends cdk.Stack {
       },
     });
 
-    const forecastScraper = new ScraperWorker(this, "ForecastScraperConstruct", {
-      projectName,
-      scraperName: "forecast-scraper",
-      codePath: path.join(
-        codebuildSrcDir,
-        "packages",
-        "scrapers",
-        "forecast_scraper",
-      ),
-      timeout: 60,
-      memorySize: 1024,
-      environment: {
-        DATA_BUCKET: dataBucket.bucketName,
-        FORECAST_COMPLETION_QUEUE_URL: forecastCompletionQueue.queue.queueUrl,
+    const forecastScraper = new ScraperWorker(
+      this,
+      "ForecastScraperConstruct",
+      {
+        projectName,
+        scraperName: "forecast-scraper",
+        codePath: path.join(
+          codebuildSrcDir,
+          "packages",
+          "scrapers",
+          "forecast_scraper",
+        ),
+        timeout: 60,
+        memorySize: 1024,
+        environment: {
+          DATA_BUCKET: dataBucket.bucketName,
+          FORECAST_COMPLETION_QUEUE_URL: forecastCompletionQueue.queue.queueUrl,
+        },
       },
-    });
+    );
 
     const discoveryRunPlanner = new DockerFunction(
       this,
@@ -307,7 +325,9 @@ export class InfrastructureStack extends cdk.Stack {
       discoverySpotBatchProcessor.lambdaFunction,
     );
     forecastControlTable.grantReadWriteData(forecastRunPlanner.lambdaFunction);
-    forecastControlTable.grantReadWriteData(forecastSpotProcessor.lambdaFunction);
+    forecastControlTable.grantReadWriteData(
+      forecastSpotProcessor.lambdaFunction,
+    );
     forecastSpotProcessor.lambdaFunction.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["dynamodb:TransactWriteItems"],
@@ -328,7 +348,9 @@ export class InfrastructureStack extends cdk.Stack {
       discoveryCompletion.lambdaFunction,
     );
     forecastScraper.queue.grantSendMessages(forecastRunPlanner.lambdaFunction);
-    forecastCompletionQueue.queue.grantSendMessages(forecastScraper.lambdaFunction);
+    forecastCompletionQueue.queue.grantSendMessages(
+      forecastScraper.lambdaFunction,
+    );
     supabasePostgresUrl.grantRead(discoveryRunPlanner.lambdaFunction);
     supabasePostgresUrl.grantRead(discoverySpotBatchProcessor.lambdaFunction);
     supabasePostgresUrl.grantRead(forecastRunPlanner.lambdaFunction);
