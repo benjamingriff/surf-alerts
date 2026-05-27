@@ -357,6 +357,7 @@ export class InfrastructureStack extends cdk.Stack {
     supabasePostgresUrl.grantRead(forecastSpotProcessor.lambdaFunction);
 
     new events.Rule(this, "ForecastRunPlannerHourlyRule", {
+      ruleName: `${projectName}-forecast-run-planner-schedule`,
       schedule: events.Schedule.cron({ minute: "0" }),
       targets: [new targets.LambdaFunction(forecastRunPlanner.lambdaFunction)],
     });
