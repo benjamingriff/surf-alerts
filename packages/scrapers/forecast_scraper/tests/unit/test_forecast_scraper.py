@@ -92,7 +92,11 @@ def test_process_record_success_writes_raw_and_sends_success(monkeypatch):
     completion = CompletionSpy()
     writes = []
 
-    monkeypatch.setattr(handler, "scrape_forecast", lambda spot_id: {"rating": {}, "tides": {}, "wave": {}, "wind": {}})
+    monkeypatch.setattr(
+        handler,
+        "scrape_forecast",
+        lambda spot_id: {"rating": {}, "tides": {}, "wave": {}, "wind": {}},
+    )
     monkeypatch.setattr(handler, "utc_now_iso", lambda: "2026-05-22T14:01:00Z")
     monkeypatch.setattr(handler.s3_writer, "put_json", lambda **kwargs: writes.append(kwargs))
 
@@ -147,7 +151,9 @@ def test_completion_send_failure_raises(monkeypatch):
         def send_failure(self, **kwargs):
             raise RuntimeError("sqs down")
 
-    monkeypatch.setattr(handler, "scrape_forecast", lambda _spot_id: (_ for _ in ()).throw(ValueError("bad")))
+    monkeypatch.setattr(
+        handler, "scrape_forecast", lambda _spot_id: (_ for _ in ()).throw(ValueError("bad"))
+    )
 
     with pytest.raises(RuntimeError, match="sqs down"):
         handler.process_record(REQUEST, completion_sender=BrokenCompletion())

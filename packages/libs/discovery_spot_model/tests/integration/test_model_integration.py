@@ -48,7 +48,9 @@ def test_current_spot_scraper_payload_to_added_scd2_row_success_path():
     assert "board_types" not in row
 
 
-@pytest.mark.parametrize("field", ["spot_id", "name", "lat", "lon", "timezone", "utc_offset", "abbr_timezone", "href"])
+@pytest.mark.parametrize(
+    "field", ["spot_id", "name", "lat", "lon", "timezone", "utc_offset", "abbr_timezone", "href"]
+)
 def test_current_spot_scraper_payload_requires_core_fields(field):
     raw_payload = json.loads(EXAMPLE_SPOT_PATH.read_text())
     spot_id = raw_payload["spot"]["spot_id"]
@@ -117,6 +119,6 @@ def test_checksum_changes_when_canonical_business_content_changes():
     changed = json.loads(EXAMPLE_SPOT_PATH.read_text())
     changed["spot"]["name"] = "Rest Bay Changed"
 
-    assert compute_spot_checksum(canonicalize_spot_report(raw, raw["spot"]["spot_id"])) != compute_spot_checksum(
-        canonicalize_spot_report(changed, changed["spot"]["spot_id"])
-    )
+    assert compute_spot_checksum(
+        canonicalize_spot_report(raw, raw["spot"]["spot_id"])
+    ) != compute_spot_checksum(canonicalize_spot_report(changed, changed["spot"]["spot_id"]))

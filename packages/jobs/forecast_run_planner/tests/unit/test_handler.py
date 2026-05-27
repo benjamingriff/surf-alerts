@@ -24,7 +24,9 @@ def test_due_offsets_and_date_boundary():
         min_offset=-12,
         max_offset=14,
     ) == [-10, 14]
-    assert (scheduled.replace(tzinfo=None) if False else scheduled).date().isoformat() == "2026-05-22"
+    assert (
+        scheduled.replace(tzinfo=None) if False else scheduled
+    ).date().isoformat() == "2026-05-22"
 
 
 def test_parse_scheduled_time_requires_utc():
@@ -40,9 +42,7 @@ def test_parse_scheduled_time_requires_utc():
 
 def test_forecast_run_id_is_deterministic():
     assert (
-        h.forecast_run_id(
-            utc_offset=-10, scrape_date="2026-05-22", local_scrape_time="04:00"
-        )
+        h.forecast_run_id(utc_offset=-10, scrape_date="2026-05-22", local_scrape_time="04:00")
         == "forecast#offset=-10#scrape_date=2026-05-22#time=04-00"
     )
 

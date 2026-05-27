@@ -225,9 +225,7 @@ def apply_spot_version_changes(
             ]
 
             _close_current_rows(cur, valid_from=valid_from, spot_ids=list(current_removed))
-            _close_current_removed_tombstones(
-                cur, valid_from=valid_from, spot_ids=readded_spot_ids
-            )
+            _close_current_removed_tombstones(cur, valid_from=valid_from, spot_ids=readded_spot_ids)
             _insert_rows(cur, tombstone_rows)
             _insert_rows(cur, rows_to_insert)
 

@@ -78,9 +78,18 @@ def canonicalize_spot_report(raw_payload: dict[str, Any], spot_id: str) -> dict[
         "lat": location.get("lat") if location.get("lat") is not None else spot.get("lat"),
         "lon": location.get("lon") if location.get("lon") is not None else spot.get("lon"),
         "timezone": spot.get("timezone") or associated.get("timezone"),
-        "utc_offset": spot.get("utc_offset") if spot.get("utc_offset") is not None else spot.get("utcOffset") if spot.get("utcOffset") is not None else associated.get("utcOffset"),
-        "abbr_timezone": spot.get("abbr_timezone") or spot.get("abbrTimezone") or associated.get("abbrTimezone"),
-        "href": spot.get("href") or associated.get("href") or spot.get("sitemapLink") or spot.get("sitemap_link"),
+        "utc_offset": spot.get("utc_offset")
+        if spot.get("utc_offset") is not None
+        else spot.get("utcOffset")
+        if spot.get("utcOffset") is not None
+        else associated.get("utcOffset"),
+        "abbr_timezone": spot.get("abbr_timezone")
+        or spot.get("abbrTimezone")
+        or associated.get("abbrTimezone"),
+        "href": spot.get("href")
+        or associated.get("href")
+        or spot.get("sitemapLink")
+        or spot.get("sitemap_link"),
         "breadcrumbs": _norm(
             spot.get("breadCrumbs") or spot.get("breadcrumbs") or spot.get("breadcrumb") or []
         ),

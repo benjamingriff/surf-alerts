@@ -15,6 +15,7 @@ members = [
     "forecast-control",
     "forecast-run-planner",
     "forecast-scraper",
+    "forecast-spot-processor",
     "forecast-transform",
     "postgres-client",
     "sitemap-scraper",
@@ -475,6 +476,25 @@ requires-dist = [
     { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
     { name = "boto3", specifier = ">=1.42.15" },
     { name = "curl-cffi", specifier = ">=0.14.0" },
+]
+
+[[package]]
+name = "forecast-spot-processor"
+version = "0.1.0"
+source = { editable = "packages/jobs/forecast_spot_processor" }
+dependencies = [
+    { name = "boto3" },
+    { name = "forecast-control" },
+    { name = "forecast-transform" },
+    { name = "postgres-client" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", specifier = ">=1.35.0" },
+    { name = "forecast-control", editable = "packages/libs/forecast_control" },
+    { name = "forecast-transform", editable = "packages/libs/forecast_transform" },
+    { name = "postgres-client", editable = "packages/libs/postgres_client" },
 ]
 
 [[package]]

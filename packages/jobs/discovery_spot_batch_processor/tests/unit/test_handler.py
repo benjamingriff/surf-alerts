@@ -89,9 +89,7 @@ class FakeCursor:
         if "spot_id = any" in sql:
             ids = set(params[0])
             if "event_type <> 'removed'" in sql:
-                self._fetchall = [
-                    row for row in self.removed_rows if row["spot_id"] in ids
-                ]
+                self._fetchall = [row for row in self.removed_rows if row["spot_id"] in ids]
             else:
                 self._fetchall = [
                     {"spot_id": spot_id, **row}
@@ -361,7 +359,9 @@ def test_process_discovery_run_completes_when_success_count_matches(monkeypatch)
         "discovery_spot_batch_processor.handler._get_json",
         lambda *_: {"removed_spot_ids": [], "sitemap_raw_key": "raw/sitemap.json.gz"},
     )
-    monkeypatch.setattr("discovery_spot_batch_processor.handler.build_added_rows", fake_build_added_rows)
+    monkeypatch.setattr(
+        "discovery_spot_batch_processor.handler.build_added_rows", fake_build_added_rows
+    )
     monkeypatch.setattr("discovery_spot_batch_processor.handler.connect", fake_connect)
     monkeypatch.setattr(
         "discovery_spot_batch_processor.handler.apply_spot_version_changes",

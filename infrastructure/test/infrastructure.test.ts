@@ -13,6 +13,8 @@ test("discovery infrastructure resources are synthesized", () => {
     "surf-alerts-discovery-run-planner",
     "surf-alerts-discovery-completion",
     "surf-alerts-discovery-spot-batch-processor",
+    "surf-alerts-forecast-run-planner",
+    "surf-alerts-forecast-spot-processor",
   ].forEach((functionName) => {
     template.hasResourceProperties("AWS::Lambda::Function", { FunctionName: functionName });
   });
@@ -22,6 +24,7 @@ test("discovery infrastructure resources are synthesized", () => {
     "surf-alerts-discovery-completion-queue",
     "surf-alerts-discovery-run-planner-queue",
     "surf-alerts-discovery-spot-batch-processor-queue",
+    "surf-alerts-forecast-completion-queue",
   ].forEach((queueName) => template.hasResourceProperties("AWS::SQS::Queue", { QueueName: queueName }));
 
   template.hasResourceProperties("AWS::DynamoDB::Table", {
@@ -29,7 +32,7 @@ test("discovery infrastructure resources are synthesized", () => {
     TimeToLiveSpecification: { AttributeName: "expires_at", Enabled: true },
   });
 
-  template.resourceCountIs("AWS::Events::Rule", 1);
+  template.resourceCountIs("AWS::Events::Rule", 2);
   template.hasResourceProperties("AWS::Events::Rule", {
     ScheduleExpression: "cron(0 6 1 * ? *)",
   });
@@ -46,5 +49,36 @@ test("discovery infrastructure resources are synthesized", () => {
   template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
     BatchSize: 10,
     FunctionName: { Ref: Match.stringLikeRegexp("DiscoveryCompletionConstructLambdaFn") },
+  });
+
+  template.hasResourceProperties("AWS::Lambda::Function", {
+    FunctionName: "surf-alerts-forecast-spot-processor",
+    Timeout: 300,
+    MemorySize: 1024,
+  });
+  template.hasResourceProperties("AWS::SQS::Queue", {
+    QueueName: "surf-alerts-forecast-completion-queue",
+    VisibilityTimeout: 1800,
+  });
+  template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+    BatchSize: 1,
+    ScalingConfig: { MaximumConcurrency: 2 },
+    FunctionName: { Ref: Match.stringLikeRegexp("ForecastSpotProcessorConstructLambdaFn") },
+  });
+  template.hasResourceProperties("AWS::IAM::Policy", {
+    PolicyDocument: {
+      Statement: Match.arrayWith([
+        Match.objectLike({
+          Action: "dynamodb:TransactWriteItems",
+          Effect: "Allow",
+          Resource: {
+            "Fn::GetAtt": [
+              Match.stringLikeRegexp("ForecastControlTable"),
+              "Arn",
+            ],
+          },
+        }),
+      ]),
+    },
   });
 });

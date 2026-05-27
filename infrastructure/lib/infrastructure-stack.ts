@@ -6,6 +6,7 @@ import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import { DockerFunction } from "./constructs/docker-function";
 import { ScheduledScraper } from "./constructs/scheduled-scraper";
@@ -267,11 +268,35 @@ export class InfrastructureStack extends cdk.Stack {
       },
     );
 
+    const forecastSpotProcessor = new DockerFunction(
+      this,
+      "ForecastSpotProcessorConstruct",
+      {
+        projectName,
+        functionName: "forecast-spot-processor",
+        codePath: codebuildSrcDir,
+        dockerfile: path.join(
+          "packages",
+          "jobs",
+          "forecast_spot_processor",
+          "Dockerfile",
+        ),
+        timeout: 300,
+        memorySize: 1024,
+        environment: {
+          FORECAST_CONTROL_TABLE_NAME: forecastControlTable.tableName,
+          SUPABASE_POSTGRES_URL_PARAMETER_NAME:
+            "/surf-alerts/supabase/postgres-url",
+        },
+      },
+    );
+
     dataBucket.grantReadWrite(sitemapScraper.lambdaFunction);
     dataBucket.grantReadWrite(spotScraper.lambdaFunction);
     dataBucket.grantReadWrite(forecastScraper.lambdaFunction);
     dataBucket.grantReadWrite(discoveryRunPlanner.lambdaFunction);
     dataBucket.grantReadWrite(discoverySpotBatchProcessor.lambdaFunction);
+    dataBucket.grantRead(forecastSpotProcessor.lambdaFunction);
     discoveryControlTable.grantReadWriteData(
       discoveryRunPlanner.lambdaFunction,
     );
@@ -282,6 +307,13 @@ export class InfrastructureStack extends cdk.Stack {
       discoverySpotBatchProcessor.lambdaFunction,
     );
     forecastControlTable.grantReadWriteData(forecastRunPlanner.lambdaFunction);
+    forecastControlTable.grantReadWriteData(forecastSpotProcessor.lambdaFunction);
+    forecastSpotProcessor.lambdaFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:TransactWriteItems"],
+        resources: [forecastControlTable.tableArn],
+      }),
+    );
     discoveryRunPlannerQueue.queue.grantSendMessages(
       sitemapScraper.lambdaFunction,
     );
@@ -300,6 +332,7 @@ export class InfrastructureStack extends cdk.Stack {
     supabasePostgresUrl.grantRead(discoveryRunPlanner.lambdaFunction);
     supabasePostgresUrl.grantRead(discoverySpotBatchProcessor.lambdaFunction);
     supabasePostgresUrl.grantRead(forecastRunPlanner.lambdaFunction);
+    supabasePostgresUrl.grantRead(forecastSpotProcessor.lambdaFunction);
 
     new events.Rule(this, "ForecastRunPlannerHourlyRule", {
       schedule: events.Schedule.cron({ minute: "0" }),
@@ -332,6 +365,14 @@ export class InfrastructureStack extends cdk.Stack {
           maxConcurrency: 2,
         },
       ),
+    );
+    forecastSpotProcessor.lambdaFunction.addEventSource(
+      new lambdaEventSources.SqsEventSource(forecastCompletionQueue.queue, {
+        batchSize: 1,
+        enabled: true,
+        reportBatchItemFailures: false,
+        maxConcurrency: 2,
+      }),
     );
   }
 }

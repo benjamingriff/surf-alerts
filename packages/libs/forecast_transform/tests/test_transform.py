@@ -34,7 +34,9 @@ def test_transforms_sample_forecast_into_all_five_v1_fact_row_sets():
 
 
 def test_rating_rows_include_forecast_time_rating_source_offset_run_init_and_lineage():
-    row = transform_forecast_envelope(sample_envelope(), source_raw_key="raw/key.json.gz").ratings[0]
+    row = transform_forecast_envelope(sample_envelope(), source_raw_key="raw/key.json.gz").ratings[
+        0
+    ]
 
     assert row["forecast_ts"] == "2026-05-25T23:00:00+00:00"
     assert row["rating_key"] == "POOR_TO_FAIR"
