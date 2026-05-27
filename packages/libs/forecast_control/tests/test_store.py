@@ -129,7 +129,7 @@ def test_create_run_if_absent_writes_run_once_with_initial_control_state():
 
 
 @mock_aws
-def test_seed_spots_can_overwrite_on_initial_planning_and_get_run_reads_by_run_key():
+def test_seed_spots_can_overwrite_on_initial_planning_and_get_run_reads_by_run_key(monkeypatch):
     dynamodb, table = create_table()
     store = ForecastControlStore(table_name="forecast-control-test", dynamodb_resource=dynamodb)
     run_id = "forecast#offset=-10#scrape_date=2026-05-22#time=04-00"
@@ -152,8 +152,18 @@ def test_seed_spots_can_overwrite_on_initial_planning_and_get_run_reads_by_run_k
     )
     store.seed_spots(forecast_run_id=run_id, spots=spots)
 
-    run = store.get_run(run_id)
+    captured = []
+    original_get_item = store.table.get_item
+
+    def capture_get_item(**kwargs):
+        captured.append(kwargs)
+        return original_get_item(**kwargs)
+
+    monkeypatch.setattr(store.table, "get_item", capture_get_item)
+
+    run = store.get_run(run_id, consistent_read=True)
     spot = table.get_item(Key=store.spot_key(run_id, "s1"))["Item"]
+    assert captured[0]["ConsistentRead"] is True
     assert run is not None
     assert run["forecast_run_id"] == run_id
     assert spot["item_type"] == "forecast_planned_spot"
@@ -421,4 +431,105 @@ def test_claim_processing_and_mark_success_increment_processing_once(monkeypatch
     assert run["successful_processing_count"] == 1
     assert run["scrape_status"] == "complete"
     assert run["processing_status"] == "complete"
+    assert run["status"] == "complete"
+
+
+@mock_aws
+def test_failed_scrape_counts_once_and_run_completes_with_scrape_failures(monkeypatch):
+    dynamodb, table = create_table()
+    store = ForecastControlStore(table_name="forecast-control-test", dynamodb_resource=dynamodb)
+    run_id = "forecast#offset=-10#scrape_date=2026-05-22#time=04-00"
+    store.create_run_if_absent(
+        forecast_run_id=run_id,
+        scrape_date="2026-05-22",
+        scheduled_utc_time="2026-05-22T14:00:00+00:00",
+        local_scrape_time="04:00",
+        local_date="2026-05-22",
+        utc_offset=-10,
+        expected_scrape_count=1,
+    )
+    store.seed_spots(forecast_run_id=run_id, spots=[{"spot_id": "s1", "spot_version_id": "v1"}])
+    install_transaction_stub(store, table, monkeypatch)
+
+    assert (
+        store.record_scrape_terminal(
+            forecast_run_id=run_id,
+            spot_id="s1",
+            scrape_status="failed",
+            failure_source="fetch",
+            failure_reason="timeout",
+        )
+        is True
+    )
+    assert (
+        store.record_scrape_terminal(
+            forecast_run_id=run_id,
+            spot_id="s1",
+            scrape_status="failed",
+            failure_source="fetch",
+            failure_reason="timeout",
+        )
+        is False
+    )
+    store.update_run_rollup(run_id)
+
+    run = table.get_item(Key=store.run_key(run_id))["Item"]
+    spot = table.get_item(Key=store.spot_key(run_id, "s1"))["Item"]
+    assert spot["scrape_failure_source"] == "fetch"
+    assert run["terminal_scrape_count"] == 1
+    assert run["failed_scrape_count"] == 1
+    assert run["expected_processing_count"] == 0
+    assert run["scrape_status"] == "complete_with_failures"
+    assert run["processing_status"] == "complete"
+    assert run["status"] == "complete"
+
+
+@mock_aws
+def test_processing_failure_counts_once_and_run_completes_with_processing_failures(monkeypatch):
+    dynamodb, table = create_table()
+    store = ForecastControlStore(table_name="forecast-control-test", dynamodb_resource=dynamodb)
+    run_id = "forecast#offset=-10#scrape_date=2026-05-22#time=04-00"
+    store.create_run_if_absent(
+        forecast_run_id=run_id,
+        scrape_date="2026-05-22",
+        scheduled_utc_time="2026-05-22T14:00:00+00:00",
+        local_scrape_time="04:00",
+        local_date="2026-05-22",
+        utc_offset=-10,
+        expected_scrape_count=1,
+    )
+    store.seed_spots(forecast_run_id=run_id, spots=[{"spot_id": "s1", "spot_version_id": "v1"}])
+    install_transaction_stub(store, table, monkeypatch)
+    store.record_scrape_terminal(forecast_run_id=run_id, spot_id="s1", scrape_status="success")
+    assert store.claim_processing(forecast_run_id=run_id, spot_id="s1") is True
+
+    assert (
+        store.mark_processing_terminal(
+            forecast_run_id=run_id,
+            spot_id="s1",
+            processing_status="failed",
+            failure_source="postgres",
+            failure_reason="boom",
+        )
+        is True
+    )
+    assert (
+        store.mark_processing_terminal(
+            forecast_run_id=run_id,
+            spot_id="s1",
+            processing_status="failed",
+            failure_source="postgres",
+            failure_reason="boom",
+        )
+        is False
+    )
+    store.update_run_rollup(run_id)
+
+    run = table.get_item(Key=store.run_key(run_id))["Item"]
+    spot = table.get_item(Key=store.spot_key(run_id, "s1"))["Item"]
+    assert spot["processing_failure_source"] == "postgres"
+    assert run["terminal_processing_count"] == 1
+    assert run["failed_processing_count"] == 1
+    assert run["scrape_status"] == "complete"
+    assert run["processing_status"] == "complete_with_failures"
     assert run["status"] == "complete"

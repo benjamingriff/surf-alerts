@@ -1,11 +1,14 @@
 import gzip
 import json
+import logging
 from typing import Any
 
 import boto3
 from forecast_control import ForecastControlStore
 from forecast_transform import ForecastRows, transform_forecast_envelope
 from postgres_client import connect
+
+logger = logging.getLogger(__name__)
 
 TABLE_COLUMNS = {
     "forecast_fact_rating": [
@@ -181,33 +184,51 @@ def process_completion(
         failure_source=message.get("failure_source"),
         failure_reason=message.get("failure_reason"),
     )
-    if not recorded:
-        return "duplicate"
 
     if scrape_status != "success":
         store.update_run_rollup(run_id)
-        return "scrape_failed"
+        return "scrape_failed" if recorded else "duplicate"
+
+    if not recorded:
+        logger.info(
+            "duplicate scrape completion; checking processing claim",
+            extra={"forecast_run_id": run_id, "spot_id": spot_id},
+        )
 
     if not store.claim_processing(forecast_run_id=run_id, spot_id=spot_id):
         store.update_run_rollup(run_id)
-        return "processing_already_claimed"
+        return "processing_already_claimed" if recorded else "duplicate"
 
+    failure_source = "processor"
     try:
         raw_key = message["raw_key"]
+        failure_source = "s3"
         envelope = _get_json(message["raw_bucket"], raw_key)
+        failure_source = "transform"
         rows = transform_forecast_envelope(envelope, source_raw_key=raw_key)
+        failure_source = "postgres"
         if connection is None:
             with connect() as conn:
                 insert_forecast_rows(conn, rows)
         else:
             insert_forecast_rows(connection, rows)
     except Exception as exc:
+        reason = str(exc)[:1000]
+        logger.warning(
+            "forecast spot processing failed",
+            extra={
+                "forecast_run_id": run_id,
+                "spot_id": spot_id,
+                "failure_source": failure_source,
+                "failure_reason": reason,
+            },
+        )
         store.mark_processing_terminal(
             forecast_run_id=run_id,
             spot_id=spot_id,
             processing_status="failed",
-            failure_source="processor",
-            failure_reason=str(exc)[:1000],
+            failure_source=failure_source,
+            failure_reason=reason,
         )
         store.update_run_rollup(run_id)
         return "processing_failed"

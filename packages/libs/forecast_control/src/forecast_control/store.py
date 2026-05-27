@@ -143,8 +143,12 @@ class ForecastControlStore:
                     continue
                 raise
 
-    def get_run(self, forecast_run_id: str) -> dict[str, Any] | None:
-        return self.table.get_item(Key=self.run_key(forecast_run_id)).get("Item")
+    def get_run(
+        self, forecast_run_id: str, *, consistent_read: bool = False
+    ) -> dict[str, Any] | None:
+        return self.table.get_item(
+            Key=self.run_key(forecast_run_id), ConsistentRead=consistent_read
+        ).get("Item")
 
     def mark_run_in_progress(self, forecast_run_id: str) -> bool:
         try:
@@ -347,35 +351,44 @@ class ForecastControlStore:
             raise
 
     def update_run_rollup(self, forecast_run_id: str) -> None:
-        run = self.get_run(forecast_run_id)
+        run = self.get_run(forecast_run_id, consistent_read=True)
         if not run:
             return
-        scrape_complete = run.get("terminal_scrape_count", 0) >= run.get("expected_scrape_count", 0)
-        processing_complete = run.get("terminal_processing_count", 0) >= run.get(
-            "expected_processing_count", 0
-        )
-        scrape_status = (
-            "complete_with_failures" if run.get("failed_scrape_count", 0) else "complete"
-        )
-        processing_status = (
-            "complete_with_failures" if run.get("failed_processing_count", 0) else "complete"
-        )
-        update = "SET updated_at=:now, expires_at=:ttl"
-        values: dict[str, Any] = {":now": _isoformat(), ":ttl": self._ttl()}
+        expected_scrapes = run.get("expected_scrape_count", 0)
+        terminal_scrapes = run.get("terminal_scrape_count", 0)
+        expected_processing = run.get("expected_processing_count", 0)
+        terminal_processing = run.get("terminal_processing_count", 0)
+        scrape_complete = terminal_scrapes >= expected_scrapes
+        processing_complete = terminal_processing >= expected_processing
+
+        scrape_status = "in_progress"
         if scrape_complete:
-            update += ", scrape_status=:scrape_status"
-            values[":scrape_status"] = scrape_status
-        if processing_complete:
-            update += ", processing_status=:processing_status"
-            values[":processing_status"] = processing_status
-        if scrape_complete and processing_complete:
-            update += ", #s=:complete"
-            values[":complete"] = RUN_STATUS_COMPLETE
+            scrape_status = (
+                "complete_with_failures" if run.get("failed_scrape_count", 0) else "complete"
+            )
+
+        processing_status = "not_started"
+        if expected_processing > 0 and not processing_complete:
+            processing_status = "in_progress"
+        elif processing_complete:
+            processing_status = (
+                "complete_with_failures" if run.get("failed_processing_count", 0) else "complete"
+            )
+
+        update = "SET updated_at=:now, expires_at=:ttl, scrape_status=:scrape_status, processing_status=:processing_status"
+        values: dict[str, Any] = {
+            ":now": _isoformat(),
+            ":ttl": self._ttl(),
+            ":scrape_status": scrape_status,
+            ":processing_status": processing_status,
+        }
         kwargs = {
             "Key": self.run_key(forecast_run_id),
             "UpdateExpression": update,
             "ExpressionAttributeValues": values,
         }
         if scrape_complete and processing_complete:
+            kwargs["UpdateExpression"] += ", #s=:complete"
             kwargs["ExpressionAttributeNames"] = {"#s": "status"}
+            values[":complete"] = RUN_STATUS_COMPLETE
         self.table.update_item(**kwargs)

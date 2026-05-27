@@ -43,14 +43,16 @@ def envelope():
 class StoreSpy:
     def __init__(self):
         self.calls = []
+        self.record_result = True
+        self.claim_result = True
 
     def record_scrape_terminal(self, **kwargs):
         self.calls.append(("record_scrape_terminal", kwargs))
-        return True
+        return self.record_result
 
     def claim_processing(self, **kwargs):
         self.calls.append(("claim_processing", kwargs))
-        return True
+        return self.claim_result
 
     def mark_processing_terminal(self, **kwargs):
         self.calls.append(("mark_processing_terminal", kwargs))
@@ -150,13 +152,14 @@ def test_processing_failure_marks_terminal_and_does_not_raise():
     ]
     failure = store.calls[2][1]
     assert failure["processing_status"] == "failed"
-    assert failure["failure_source"] == "processor"
+    assert failure["failure_source"] == "s3"
     assert failure["failure_reason"]
 
 
-def test_duplicate_success_completion_skips_claim_and_writes():
+def test_duplicate_success_completion_without_claim_skips_writes():
     store = StoreSpy()
-    store.record_scrape_terminal = lambda **kwargs: False
+    store.record_result = False
+    store.claim_result = False
     conn = ConnSpy()
 
     result = process_completion(
@@ -166,4 +169,63 @@ def test_duplicate_success_completion_skips_claim_and_writes():
     )
 
     assert result == "duplicate"
+    assert [name for name, _ in store.calls] == [
+        "record_scrape_terminal",
+        "claim_processing",
+        "update_run_rollup",
+    ]
     assert conn.cursor_spy.executed == []
+
+
+def test_failed_scrape_completion_records_failure_and_skips_processing():
+    store = StoreSpy()
+    conn = ConnSpy()
+
+    result = process_completion(
+        {
+            "forecast_run_id": "run-1",
+            "spot_id": "spot-1",
+            "scrape_status": "failed",
+            "failure_source": "fetch",
+            "failure_reason": "timeout",
+        },
+        store=store,
+        connection=conn,
+    )
+
+    assert result == "scrape_failed"
+    assert [name for name, _ in store.calls] == ["record_scrape_terminal", "update_run_rollup"]
+    assert store.calls[0][1]["failure_source"] == "fetch"
+    assert conn.cursor_spy.executed == []
+
+
+@mock_aws
+def test_duplicate_success_completion_can_reclaim_processing_and_insert_rows():
+    s3 = boto3.client("s3", region_name="us-east-1")
+    s3.create_bucket(Bucket="raw-bucket")
+    body = gzip.compress(json.dumps(envelope()).encode())
+    s3.put_object(Bucket="raw-bucket", Key="forecast/raw.json.gz", Body=body)
+    store = StoreSpy()
+    store.record_result = False
+    conn = ConnSpy()
+
+    result = process_completion(
+        {
+            "forecast_run_id": "run-1",
+            "spot_id": "spot-1",
+            "scrape_status": "success",
+            "raw_bucket": "raw-bucket",
+            "raw_key": "forecast/raw.json.gz",
+        },
+        store=store,
+        connection=conn,
+    )
+
+    assert result == "success"
+    assert conn.transactions == 1
+    assert [name for name, _ in store.calls] == [
+        "record_scrape_terminal",
+        "claim_processing",
+        "mark_processing_terminal",
+        "update_run_rollup",
+    ]
