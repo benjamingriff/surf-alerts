@@ -38,44 +38,40 @@ Surfline API
         └──▶ control/...        Manifests, checkpoints, completion records
 ```
 
-### Forecast Flow (Planned Target)
+### Forecast Flow
 
 ```
-Hourly Scheduler Tick (UTC)
+Hourly EventBridge tick (UTC)
      │
-     └──▶ Forecast Batch Planner
-            ├── Reads: processed/discovery/catalog_latest/...
-            ├── Groups: live spots by timezone
-            ├── Writes: control/manifests/forecast_batches/...
+     └──▶ Forecast Run Planner
+            ├── Reads: live processed spots for only the due UTC offset
+            ├── Writes: DynamoDB Forecast Run + planned spot control items
             └── Enqueues: one forecast scrape per spot_id
 
-SQS
+Forecast scrape SQS
      │
-     └──▶ Forecast Scraper ──▶ raw/forecast/...
-                              └──▶ control/completions/forecast_batches/...
+     └──▶ Forecast Scraper
+            ├── Fetches: rating, tides, wave, wind
+            ├── Writes: raw/forecast/... only for successful scrapes
+            └── Emits: terminal completion message
 
-Raw write / completion marker
+Forecast completion SQS
      │
-     └──▶ Forecast Batch Completion
-            ├── Reads: batch manifest + completion markers
-            └── Writes: control/manifests/processing/domain=forecast/...
-
-Processing manifest
-     │
-     └──▶ Forecast Processor
-            ├── Reads: all raw forecast objects in the completed batch
-            ├── Writes: processed/forecast/canonical/...
-            ├── Writes: processed/forecast/presentation/...
-            └── Writes: processed/forecast/history/...
+     └──▶ Forecast Spot Processor
+            ├── Records scrape terminal state in DynamoDB
+            ├── Reads successful raw forecast object from S3
+            ├── Transforms rating, wave, swells, wind, tides
+            ├── Inserts Postgres fact rows in one transaction
+            └── Updates DynamoDB processing/run rollup state
 ```
 
-Key forecast rule:
+Key forecast rules:
 
-- the authoritative completion boundary is the timezone-local batch, not the individual raw object
+- Forecast v1 uses DynamoDB for control state, not S3 manifests or completion marker objects.
+- Weather and sunlight are intentionally excluded from collection and storage.
+- Successful fact inserts target `forecast_fact_rating`, `forecast_fact_wave`, `forecast_fact_swells`, `forecast_fact_wind`, and `forecast_fact_tides`.
 
-**Units requested:** `swellHeight=FT`, `waveHeight=FT`, `windSpeed=MPH`, `temperature=C`, `tideHeight=M`
-
-> **Note:** Tides are currently scraped in meters. Planned change: switch to `tideHeight=FT` to match the [Forecast Schema](../data_architecture/forecast-schema.md) which specifies feet.
+**Units requested:** `swellHeight=FT`, `waveHeight=FT`, `windSpeed=MPH`, `tideHeight=FT`.
 
 ### Spot Scraper Flow
 

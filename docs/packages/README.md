@@ -8,12 +8,12 @@ All packages are managed via UV workspaces from the root `pyproject.toml`.
 
 | Package | Path | Status | Description |
 |---------|------|--------|-------------|
-| [Forecast Scraper](../scrapers/forecast-scraper.md) | `packages/scrapers/forecast_scraper` | IMPLEMENTED | Scrapes 6 forecast endpoints per spot |
+| [Forecast Scraper](../scrapers/forecast-scraper.md) | `packages/scrapers/forecast_scraper` | IMPLEMENTED | Scrapes rating, tides, wave, and wind per planned forecast spot |
 | [Spot Scraper](../scrapers/spot-scraper.md) | `packages/scrapers/spot_scraper` | IMPLEMENTED | Scrapes spot metadata from `/reports` |
 | [Sitemap Scraper](../scrapers/sitemap-scraper.md) | `packages/scrapers/sitemap_scraper` | IMPLEMENTED | Parses Surfline sitemap XML |
 | [Taxonomy Scraper](../scrapers/taxonomy-scraper.md) | `packages/scrapers/taxonomy_scraper` | IMPLEMENTED | Legacy geographic hierarchy scraper |
 | [Discovery Processors](discovery-processors.md) | `packages/jobs/discovery_*` | PLANNED | Sitemap diff, spot report processing, latest catalog build |
-| [Forecast Processors](forecast-processors.md) | `packages/jobs/forecast_*` | PLANNED | Batch planning, completion detection, canonical forecast processing |
+| [Forecast Processors](forecast-processors.md) | `packages/jobs/forecast_*` | IMPLEMENTED | Forecast Run planning, completion handling, and Postgres fact insertion |
 | [Spot Reconciler (legacy)](spot-reconciler.md) | `packages/jobs/spot_reconciler` | IMPLEMENTED | Earlier sitemap + taxonomy reconciliation approach |
 | [Archive Legacy Data](archive-legacy-data.md) | `packages/migrations/archive_legacy_data` | IMPLEMENTED | Data migration utilities |
 | [Dispatcher](dispatcher.md) | `packages/jobs/dispatcher` | PLANNED | Job orchestration |

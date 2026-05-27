@@ -113,7 +113,7 @@ Log level controlled by `POWERTOOLS_LOG_LEVEL` environment variable (default: `W
 
 | Scraper | Trigger | Endpoints | Doc |
 |---------|---------|-----------|-----|
-| [Forecast Scraper](forecast-scraper.md) | SQS | 6 forecast APIs | Per-spot forecasts |
+| [Forecast Scraper](forecast-scraper.md) | SQS | 4 forecast APIs (rating, tides, wave, wind) | Per-spot Forecast Run scrapes |
 | [Spot Scraper](spot-scraper.md) | SQS | 1 reports API | Spot metadata |
 | [Sitemap Scraper](sitemap-scraper.md) | EventBridge | Sitemap XML | Spot discovery |
 | [Taxonomy Scraper](taxonomy-scraper.md) | EventBridge | Taxonomy API | Legacy geographic hierarchy |

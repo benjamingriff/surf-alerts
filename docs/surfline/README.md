@@ -104,8 +104,8 @@ The taxonomy scraper adds a **500ms delay** between every request as a preventiv
 | Forecast | `/kbyg/spots/forecasts/wave` | Yes (forecast_scraper) | [Forecast Endpoints](forecast-endpoints.md) |
 | Forecast | `/kbyg/spots/forecasts/wind` | Yes (forecast_scraper) | [Forecast Endpoints](forecast-endpoints.md) |
 | Forecast | `/kbyg/spots/forecasts/tides` | Yes (forecast_scraper) | [Forecast Endpoints](forecast-endpoints.md) |
-| Forecast | `/kbyg/spots/forecasts/weather` | Yes (forecast_scraper) | [Forecast Endpoints](forecast-endpoints.md) |
-| Forecast | `/kbyg/spots/forecasts/sunlight` | Yes (forecast_scraper) | [Forecast Endpoints](forecast-endpoints.md) |
+| Forecast | `/kbyg/spots/forecasts/weather` | No (excluded from forecast v1) | [Forecast Endpoints](forecast-endpoints.md) |
+| Forecast | `/kbyg/spots/forecasts/sunlight` | No (excluded from forecast v1) | [Forecast Endpoints](forecast-endpoints.md) |
 | Forecast | `/kbyg/spots/forecasts/surf` | No | [Forecast Endpoints](forecast-endpoints.md) |
 | Forecast | `/kbyg/spots/forecasts/conditions` | No | [Forecast Endpoints](forecast-endpoints.md) |
 | Region | `/kbyg/regions/overview` | No | [Spot Endpoints](spot-endpoints.md) |

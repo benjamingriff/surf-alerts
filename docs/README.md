@@ -6,12 +6,12 @@ Personal surf forecast data platform. Scrapes surf and spot data from Surfline, 
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| **Forecast Scraper** | IMPLEMENTED | 6 endpoints, Docker Lambda, SQS trigger |
+| **Forecast Scraper** | IMPLEMENTED | 4 surf-condition endpoints, Docker Lambda, SQS trigger |
 | **Spot Scraper** | IMPLEMENTED | `/reports` spot metadata collection |
 | **Infrastructure (CDK)** | IMPLEMENTED | Lambda, SQS, S3, GitHub Actions CI/CD |
 | **Data Storage Architecture** | PLANNED | Partial medallion design: `raw/`, `processed/`, `control/` |
 | **Discovery Data Model** | PLANNED | Append-only Parquet version tables plus derived latest catalog |
-| **Forecast Data Model** | IMPLEMENTED | Forecast analytics schema, 7 fact/dim tables |
+| **Forecast Data Model** | IMPLEMENTED | 5 active Postgres fact tables; weather/sunlight excluded from v1 |
 | **Surfline API Reference** | IMPLEMENTED | 16 endpoints documented, verified 2026-03-06 |
 | **API Design** | PLANNED | 10 endpoints designed, FastAPI + DuckDB |
 | **Legacy Data Migration** | PLANNED | 1TB+ JSON to Parquet, ~$6-8 estimated cost |
@@ -39,7 +39,7 @@ Personal surf forecast data platform. Scrapes surf and spot data from Surfline, 
 surf-alerts/
 ├── packages/
 │   ├── scrapers/
-│   │   ├── forecast_scraper/    # 6-endpoint forecast data scraper
+│   │   ├── forecast_scraper/    # rating/tides/wave/wind forecast scraper
 │   │   └── spot_scraper/        # Spot metadata + sitemap scraper
 │   ├── jobs/
 │   │   ├── dispatcher/          # Job orchestration (planned)
