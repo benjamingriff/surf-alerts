@@ -438,11 +438,15 @@ name = "forecast-control"
 version = "0.1.0"
 source = { editable = "packages/libs/forecast_control" }
 dependencies = [
+    { name = "aws-lambda-powertools" },
     { name = "boto3" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "boto3", specifier = ">=1.35.0" }]
+requires-dist = [
+    { name = "aws-lambda-powertools", specifier = ">=3.0.0" },
+    { name = "boto3", specifier = ">=1.35.0" },
+]
 
 [[package]]
 name = "forecast-run-planner"
@@ -483,6 +487,7 @@ name = "forecast-spot-processor"
 version = "0.1.0"
 source = { editable = "packages/jobs/forecast_spot_processor" }
 dependencies = [
+    { name = "aws-lambda-powertools" },
     { name = "boto3" },
     { name = "forecast-control" },
     { name = "forecast-transform" },
@@ -491,6 +496,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
     { name = "boto3", specifier = ">=1.35.0" },
     { name = "forecast-control", editable = "packages/libs/forecast_control" },
     { name = "forecast-transform", editable = "packages/libs/forecast_transform" },

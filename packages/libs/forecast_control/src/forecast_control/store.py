@@ -7,6 +7,8 @@ import boto3
 from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
+from forecast_control.logger import get_logger
+
 FORECAST_CONTROL_TABLE_NAME = "FORECAST_CONTROL_TABLE_NAME"
 RUN_STATUS_PLANNED = "planned"
 RUN_STATUS_IN_PROGRESS = "in_progress"
@@ -14,6 +16,7 @@ RUN_STATUS_COMPLETE = "complete"
 SCHEMA_VERSION = 1
 PROCESSING_CLAIM_SECONDS = 360
 _SERIALIZER = TypeSerializer()
+logger = get_logger()
 
 
 def _utc_now() -> datetime:
@@ -238,6 +241,24 @@ class ForecastControlStore:
         run_adds = ["terminal_scrape_count :one", f"{run_inc} :one"]
         if is_success:
             run_adds.append("expected_processing_count :one")
+        run_update_expression = "SET updated_at=:now, expires_at=:ttl ADD " + ", ".join(run_adds)
+        run_expression_attribute_values = _client_attribute_values(
+            {
+                ":one": 1,
+                ":now": _isoformat(),
+                ":ttl": self._ttl(),
+            }
+        )
+        logger.info(
+            "forecast scrape terminal transaction run update",
+            extra={
+                "forecast_run_id": forecast_run_id,
+                "spot_id": spot_id,
+                "scrape_status": status,
+                "run_update_expression": run_update_expression,
+                "run_expression_attribute_values": run_expression_attribute_values,
+            },
+        )
         try:
             self.dynamodb.meta.client.transact_write_items(
                 TransactItems=[
@@ -254,17 +275,8 @@ class ForecastControlStore:
                         "Update": {
                             "TableName": self.table_name,
                             "Key": _key(self.run_key(forecast_run_id)),
-                            "UpdateExpression": (
-                                "SET updated_at=:now, expires_at=:ttl ADD "
-                                + ", ".join(run_adds)
-                            ),
-                            "ExpressionAttributeValues": _client_attribute_values(
-                                {
-                                    ":one": 1,
-                                    ":now": _isoformat(),
-                                    ":ttl": self._ttl(),
-                                }
-                            ),
+                            "UpdateExpression": run_update_expression,
+                            "ExpressionAttributeValues": run_expression_attribute_values,
                         }
                     },
                 ]
