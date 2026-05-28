@@ -358,6 +358,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     new events.Rule(this, "ForecastRunPlannerHourlyRule", {
       ruleName: `${projectName}-forecast-run-planner-schedule`,
+      enabled: false,
       schedule: events.Schedule.cron({ minute: "0" }),
       targets: [new targets.LambdaFunction(forecastRunPlanner.lambdaFunction)],
     });
