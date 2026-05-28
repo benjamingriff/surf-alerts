@@ -235,11 +235,9 @@ class ForecastControlStore:
             update.append("scrape_failure_reason=:failure_reason")
             values[":failure_reason"] = failure_reason
         run_inc = "successful_scrape_count" if is_success else "failed_scrape_count"
-        extra = (
-            ", expected_processing_count=if_not_exists(expected_processing_count, :zero) + :one"
-            if is_success
-            else ""
-        )
+        run_adds = ["terminal_scrape_count :one", f"{run_inc} :one"]
+        if is_success:
+            run_adds.append("expected_processing_count :one")
         try:
             self.dynamodb.meta.client.transact_write_items(
                 TransactItems=[
@@ -257,14 +255,11 @@ class ForecastControlStore:
                             "TableName": self.table_name,
                             "Key": _key(self.run_key(forecast_run_id)),
                             "UpdateExpression": (
-                                "SET updated_at=:now, expires_at=:ttl"
-                                f"{extra}, "
-                                "terminal_scrape_count=if_not_exists(terminal_scrape_count, :zero) + :one, "
-                                f"{run_inc}=if_not_exists({run_inc}, :zero) + :one"
+                                "SET updated_at=:now, expires_at=:ttl ADD "
+                                + ", ".join(run_adds)
                             ),
                             "ExpressionAttributeValues": _client_attribute_values(
                                 {
-                                    ":zero": 0,
                                     ":one": 1,
                                     ":now": _isoformat(),
                                     ":ttl": self._ttl(),
@@ -354,13 +349,11 @@ class ForecastControlStore:
                             "TableName": self.table_name,
                             "Key": _key(self.run_key(forecast_run_id)),
                             "UpdateExpression": (
-                                "SET updated_at=:now, expires_at=:ttl, "
-                                "terminal_processing_count=if_not_exists(terminal_processing_count, :zero) + :one, "
-                                f"{run_inc}=if_not_exists({run_inc}, :zero) + :one"
+                                "SET updated_at=:now, expires_at=:ttl ADD "
+                                f"terminal_processing_count :one, {run_inc} :one"
                             ),
                             "ExpressionAttributeValues": _client_attribute_values(
                                 {
-                                    ":zero": 0,
                                     ":one": 1,
                                     ":now": _isoformat(),
                                     ":ttl": self._ttl(),

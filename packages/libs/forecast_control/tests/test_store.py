@@ -296,20 +296,10 @@ def test_record_scrape_terminal_transaction_uses_client_attribute_value_payload(
     assert spot_update["ExpressionAttributeValues"][":ttl"]["N"].isdigit()
     assert run_update["Key"] == {"pk": {"S": "FORECAST_RUN#run-1"}, "sk": {"S": "RUN"}}
     assert run_update["ExpressionAttributeValues"][":one"] == {"N": "1"}
-    assert run_update["ExpressionAttributeValues"][":zero"] == {"N": "0"}
     assert "M" not in run_update["ExpressionAttributeValues"][":one"]
-    assert "M" not in run_update["ExpressionAttributeValues"][":zero"]
-    assert (
-        "expected_processing_count=if_not_exists(expected_processing_count, :zero) + :one"
-        in run_update["UpdateExpression"]
-    )
-    assert (
-        "terminal_scrape_count=if_not_exists(terminal_scrape_count, :zero) + :one"
-        in run_update["UpdateExpression"]
-    )
-    assert (
-        "successful_scrape_count=if_not_exists(successful_scrape_count, :zero) + :one"
-        in run_update["UpdateExpression"]
+    assert run_update["UpdateExpression"] == (
+        "SET updated_at=:now, expires_at=:ttl ADD terminal_scrape_count :one, "
+        "successful_scrape_count :one, expected_processing_count :one"
     )
 
 
@@ -339,16 +329,10 @@ def test_mark_processing_terminal_transaction_uses_client_attribute_value_payloa
     assert spot_update["ExpressionAttributeValues"][":status"] == {"S": "success"}
     assert spot_update["ExpressionAttributeValues"][":in_progress"] == {"S": "in_progress"}
     assert run_update["ExpressionAttributeValues"][":one"] == {"N": "1"}
-    assert run_update["ExpressionAttributeValues"][":zero"] == {"N": "0"}
     assert "M" not in run_update["ExpressionAttributeValues"][":one"]
-    assert "M" not in run_update["ExpressionAttributeValues"][":zero"]
-    assert (
-        "terminal_processing_count=if_not_exists(terminal_processing_count, :zero) + :one"
-        in run_update["UpdateExpression"]
-    )
-    assert (
-        "successful_processing_count=if_not_exists(successful_processing_count, :zero) + :one"
-        in run_update["UpdateExpression"]
+    assert run_update["UpdateExpression"] == (
+        "SET updated_at=:now, expires_at=:ttl ADD terminal_processing_count :one, "
+        "successful_processing_count :one"
     )
 
 
