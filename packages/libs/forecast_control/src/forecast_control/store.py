@@ -4,7 +4,6 @@ from math import ceil
 from typing import Any
 
 import boto3
-from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
 from forecast_control.logger import get_logger
@@ -15,7 +14,6 @@ RUN_STATUS_IN_PROGRESS = "in_progress"
 RUN_STATUS_COMPLETE = "complete"
 SCHEMA_VERSION = 1
 PROCESSING_CLAIM_SECONDS = 360
-_SERIALIZER = TypeSerializer()
 logger = get_logger()
 
 
@@ -25,36 +23,6 @@ def _utc_now() -> datetime:
 
 def _isoformat(value: datetime | None = None) -> str:
     return (value or _utc_now()).isoformat()
-
-
-def _attribute_values(values: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {key: _SERIALIZER.serialize(value) for key, value in values.items()}
-
-
-def _client_s(value: str) -> dict[str, str]:
-    return {"S": value}
-
-
-def _client_n(value: int) -> dict[str, str]:
-    return {"N": str(value)}
-
-
-def _client_attribute_values(values: dict[str, Any]) -> dict[str, dict[str, str]]:
-    client_values: dict[str, dict[str, str]] = {}
-    for key, value in values.items():
-        if isinstance(value, bool):
-            raise TypeError("Boolean transaction values must be serialized explicitly")
-        if isinstance(value, int):
-            client_values[key] = _client_n(value)
-        elif isinstance(value, str):
-            client_values[key] = _client_s(value)
-        else:
-            raise TypeError(f"Unsupported transaction value type for {key}: {type(value)}")
-    return client_values
-
-
-def _key(key: dict[str, str]) -> dict[str, dict[str, Any]]:
-    return {name: _SERIALIZER.serialize(value) for name, value in key.items()}
 
 
 class ForecastControlStore:
@@ -242,55 +210,37 @@ class ForecastControlStore:
         if is_success:
             run_adds.append("expected_processing_count :one")
         run_update_expression = "SET updated_at=:now, expires_at=:ttl ADD " + ", ".join(run_adds)
-        run_expression_attribute_values = _client_attribute_values(
-            {
-                ":one": 1,
-                ":now": _isoformat(),
-                ":ttl": self._ttl(),
-            }
-        )
+        try:
+            self.table.update_item(
+                Key=self.spot_key(forecast_run_id, spot_id),
+                UpdateExpression=", ".join(update),
+                ExpressionAttributeValues=values,
+                ConditionExpression="scrape_status IN (:planned, :in_progress)",
+            )
+        except ClientError as error:
+            if error.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                return False
+            raise
+
         logger.info(
-            "forecast scrape terminal transaction run update",
+            "forecast scrape terminal run counter update",
             extra={
                 "forecast_run_id": forecast_run_id,
                 "spot_id": spot_id,
                 "scrape_status": status,
                 "run_update_expression": run_update_expression,
-                "run_expression_attribute_values": run_expression_attribute_values,
             },
         )
-        try:
-            self.dynamodb.meta.client.transact_write_items(
-                TransactItems=[
-                    {
-                        "Update": {
-                            "TableName": self.table_name,
-                            "Key": _key(self.spot_key(forecast_run_id, spot_id)),
-                            "UpdateExpression": ", ".join(update),
-                            "ExpressionAttributeValues": _client_attribute_values(values),
-                            "ConditionExpression": "scrape_status IN (:planned, :in_progress)",
-                        }
-                    },
-                    {
-                        "Update": {
-                            "TableName": self.table_name,
-                            "Key": _key(self.run_key(forecast_run_id)),
-                            "UpdateExpression": run_update_expression,
-                            "ExpressionAttributeValues": run_expression_attribute_values,
-                        }
-                    },
-                ]
-            )
-            return True
-        except ClientError as error:
-            code = error.response["Error"]["Code"]
-            if code == "ConditionalCheckFailedException":
-                return False
-            if code == "TransactionCanceledException":
-                reasons = error.response.get("CancellationReasons", [])
-                if any(reason.get("Code") == "ConditionalCheckFailed" for reason in reasons):
-                    return False
-            raise
+        self.table.update_item(
+            Key=self.run_key(forecast_run_id),
+            UpdateExpression=run_update_expression,
+            ExpressionAttributeValues={
+                ":one": 1,
+                ":now": _isoformat(),
+                ":ttl": self._ttl(),
+            },
+        )
+        return True
 
     def claim_processing(self, *, forecast_run_id: str, spot_id: str) -> bool:
         now = _utc_now()
@@ -345,46 +295,30 @@ class ForecastControlStore:
             values[":failure_reason"] = failure_reason
         run_inc = "successful_processing_count" if is_success else "failed_processing_count"
         try:
-            self.dynamodb.meta.client.transact_write_items(
-                TransactItems=[
-                    {
-                        "Update": {
-                            "TableName": self.table_name,
-                            "Key": _key(self.spot_key(forecast_run_id, spot_id)),
-                            "UpdateExpression": ", ".join(update),
-                            "ExpressionAttributeValues": _client_attribute_values(values),
-                            "ConditionExpression": "processing_status=:in_progress",
-                        }
-                    },
-                    {
-                        "Update": {
-                            "TableName": self.table_name,
-                            "Key": _key(self.run_key(forecast_run_id)),
-                            "UpdateExpression": (
-                                "SET updated_at=:now, expires_at=:ttl ADD "
-                                f"terminal_processing_count :one, {run_inc} :one"
-                            ),
-                            "ExpressionAttributeValues": _client_attribute_values(
-                                {
-                                    ":one": 1,
-                                    ":now": _isoformat(),
-                                    ":ttl": self._ttl(),
-                                }
-                            ),
-                        }
-                    },
-                ]
+            self.table.update_item(
+                Key=self.spot_key(forecast_run_id, spot_id),
+                UpdateExpression=", ".join(update),
+                ExpressionAttributeValues=values,
+                ConditionExpression="processing_status=:in_progress",
             )
-            return True
         except ClientError as error:
-            code = error.response["Error"]["Code"]
-            if code == "ConditionalCheckFailedException":
+            if error.response["Error"]["Code"] == "ConditionalCheckFailedException":
                 return False
-            if code == "TransactionCanceledException":
-                reasons = error.response.get("CancellationReasons", [])
-                if any(reason.get("Code") == "ConditionalCheckFailed" for reason in reasons):
-                    return False
             raise
+
+        self.table.update_item(
+            Key=self.run_key(forecast_run_id),
+            UpdateExpression=(
+                "SET updated_at=:now, expires_at=:ttl ADD "
+                f"terminal_processing_count :one, {run_inc} :one"
+            ),
+            ExpressionAttributeValues={
+                ":one": 1,
+                ":now": _isoformat(),
+                ":ttl": self._ttl(),
+            },
+        )
+        return True
 
     def update_run_rollup(self, forecast_run_id: str) -> None:
         run = self.get_run(forecast_run_id, consistent_read=True)

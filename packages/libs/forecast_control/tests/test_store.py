@@ -2,66 +2,10 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 import pytest
-from boto3.dynamodb.types import TypeDeserializer
 from botocore.exceptions import ClientError
 from moto import mock_aws
 
 from forecast_control.store import ForecastControlStore
-
-_DESERIALIZER = TypeDeserializer()
-
-
-def _native_values(values):
-    return {key: _DESERIALIZER.deserialize(value) for key, value in values.items()}
-
-
-def install_transaction_stub(store, table, monkeypatch):
-    def transact_write_items(**kwargs):
-        # Moto currently accepts resource-style native values for transact_write_items but
-        # fails on real client AttributeValue payloads, so these tests emulate the
-        # transaction against moto using Table.update_item while preserving conditional
-        # duplicate behavior.
-        for item in kwargs["TransactItems"]:
-            update = item["Update"]
-            key = _native_values(update["Key"])
-            values = _native_values(update["ExpressionAttributeValues"])
-            condition = update.get("ConditionExpression")
-            existing = table.get_item(Key=key).get("Item", {})
-            if condition == "scrape_status IN (:planned, :in_progress)" and existing.get(
-                "scrape_status"
-            ) not in {values[":planned"], values[":in_progress"]}:
-                raise ClientError(
-                    {
-                        "Error": {"Code": "TransactionCanceledException"},
-                        "CancellationReasons": [{"Code": "ConditionalCheckFailed"}],
-                    },
-                    "TransactWriteItems",
-                )
-            if (
-                condition == "processing_status=:in_progress"
-                and existing.get("processing_status") != values[":in_progress"]
-            ):
-                raise ClientError(
-                    {
-                        "Error": {"Code": "TransactionCanceledException"},
-                        "CancellationReasons": [{"Code": "ConditionalCheckFailed"}],
-                    },
-                    "TransactWriteItems",
-                )
-        for item in kwargs["TransactItems"]:
-            update = item["Update"]
-            expression = update["UpdateExpression"]
-            values = _native_values(update["ExpressionAttributeValues"])
-            table.update_item(
-                Key=_native_values(update["Key"]),
-                UpdateExpression=expression,
-                ExpressionAttributeValues={
-                    key: value for key, value in values.items() if key in expression
-                },
-            )
-        return {}
-
-    monkeypatch.setattr(store.dynamodb.meta.client, "transact_write_items", transact_write_items)
 
 
 def create_table():
@@ -232,7 +176,6 @@ def test_record_scrape_terminal_success_increments_run_once_and_duplicate_is_ign
         expected_scrape_count=1,
     )
     store.seed_spots(forecast_run_id=run_id, spots=[{"spot_id": "s1", "spot_version_id": "v1"}])
-    install_transaction_stub(store, table, monkeypatch)
 
     first = store.record_scrape_terminal(
         forecast_run_id=run_id,
@@ -263,102 +206,7 @@ def test_record_scrape_terminal_success_increments_run_once_and_duplicate_is_ign
 
 
 @mock_aws
-def test_record_scrape_terminal_transaction_uses_client_attribute_value_payload(monkeypatch):
-    dynamodb, _table = create_table()
-    store = ForecastControlStore(table_name="forecast-control-test", dynamodb_resource=dynamodb)
-    captured = {}
-
-    def capture_transaction(**kwargs):
-        captured.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(store.dynamodb.meta.client, "transact_write_items", capture_transaction)
-
-    assert (
-        store.record_scrape_terminal(
-            forecast_run_id="run-1",
-            spot_id="s1",
-            scrape_status="success",
-            raw_bucket="bucket",
-            raw_key="key.json.gz",
-            scraped_at="2026-05-22T14:01:00+00:00",
-        )
-        is True
-    )
-
-    spot_update = captured["TransactItems"][0]["Update"]
-    run_update = captured["TransactItems"][1]["Update"]
-    assert spot_update["Key"] == {
-        "pk": {"S": "FORECAST_RUN#run-1"},
-        "sk": {"S": "SPOT#s1"},
-    }
-    assert spot_update["ExpressionAttributeValues"][":status"] == {"S": "success"}
-    assert spot_update["ExpressionAttributeValues"][":ttl"]["N"].isdigit()
-    assert run_update["Key"] == {"pk": {"S": "FORECAST_RUN#run-1"}, "sk": {"S": "RUN"}}
-    assert run_update["ExpressionAttributeValues"][":one"] == {"N": "1"}
-    assert "M" not in run_update["ExpressionAttributeValues"][":one"]
-    assert run_update["UpdateExpression"] == (
-        "SET updated_at=:now, expires_at=:ttl ADD terminal_scrape_count :one, "
-        "successful_scrape_count :one, expected_processing_count :one"
-    )
-
-
-@mock_aws
-def test_mark_processing_terminal_transaction_uses_client_attribute_value_payload(monkeypatch):
-    dynamodb, _table = create_table()
-    store = ForecastControlStore(table_name="forecast-control-test", dynamodb_resource=dynamodb)
-    captured = {}
-
-    def capture_transaction(**kwargs):
-        captured.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(store.dynamodb.meta.client, "transact_write_items", capture_transaction)
-
-    assert (
-        store.mark_processing_terminal(
-            forecast_run_id="run-1",
-            spot_id="s1",
-            processing_status="success",
-        )
-        is True
-    )
-
-    spot_update = captured["TransactItems"][0]["Update"]
-    run_update = captured["TransactItems"][1]["Update"]
-    assert spot_update["ExpressionAttributeValues"][":status"] == {"S": "success"}
-    assert spot_update["ExpressionAttributeValues"][":in_progress"] == {"S": "in_progress"}
-    assert run_update["ExpressionAttributeValues"][":one"] == {"N": "1"}
-    assert "M" not in run_update["ExpressionAttributeValues"][":one"]
-    assert run_update["UpdateExpression"] == (
-        "SET updated_at=:now, expires_at=:ttl ADD terminal_processing_count :one, "
-        "successful_processing_count :one"
-    )
-
-
-@mock_aws
-def test_transaction_canceled_without_conditional_reason_raises(monkeypatch):
-    dynamodb, _table = create_table()
-    store = ForecastControlStore(table_name="forecast-control-test", dynamodb_resource=dynamodb)
-
-    def cancel_without_reasons(**kwargs):
-        raise ClientError(
-            {"Error": {"Code": "TransactionCanceledException", "Message": "cancelled"}},
-            "TransactWriteItems",
-        )
-
-    monkeypatch.setattr(store.dynamodb.meta.client, "transact_write_items", cancel_without_reasons)
-
-    with pytest.raises(ClientError):
-        store.record_scrape_terminal(
-            forecast_run_id="run-1",
-            spot_id="s1",
-            scrape_status="success",
-        )
-
-
-@mock_aws
-def test_scrape_terminal_transaction_failure_leaves_spot_and_run_counters_unchanged(monkeypatch):
+def test_record_scrape_terminal_uses_resource_update_item_not_transaction(monkeypatch):
     dynamodb, table = create_table()
     store = ForecastControlStore(table_name="forecast-control-test", dynamodb_resource=dynamodb)
     run_id = "forecast#offset=-10#scrape_date=2026-05-22#time=04-00"
@@ -374,12 +222,102 @@ def test_scrape_terminal_transaction_failure_leaves_spot_and_run_counters_unchan
     store.seed_spots(forecast_run_id=run_id, spots=[{"spot_id": "s1", "spot_version_id": "v1"}])
 
     def fail_transaction(**kwargs):
-        raise ClientError(
-            {"Error": {"Code": "ProvisionedThroughputExceededException", "Message": "throttled"}},
-            "TransactWriteItems",
-        )
+        raise AssertionError("record_scrape_terminal should not call TransactWriteItems")
 
     monkeypatch.setattr(store.dynamodb.meta.client, "transact_write_items", fail_transaction)
+
+    assert (
+        store.record_scrape_terminal(
+            forecast_run_id=run_id,
+            spot_id="s1",
+            scrape_status="success",
+            raw_bucket="bucket",
+            raw_key="key.json.gz",
+            scraped_at="2026-05-22T14:01:00+00:00",
+        )
+        is True
+    )
+
+    run = table.get_item(Key=store.run_key(run_id))["Item"]
+    spot = table.get_item(Key=store.spot_key(run_id, "s1"))["Item"]
+    assert spot["scrape_status"] == "success"
+    assert spot["raw_key"] == "key.json.gz"
+    assert run["terminal_scrape_count"] == 1
+    assert run["successful_scrape_count"] == 1
+    assert run["expected_processing_count"] == 1
+
+
+@mock_aws
+def test_mark_processing_terminal_uses_resource_update_item_not_transaction(monkeypatch):
+    dynamodb, table = create_table()
+    store = ForecastControlStore(table_name="forecast-control-test", dynamodb_resource=dynamodb)
+    run_id = "forecast#offset=-10#scrape_date=2026-05-22#time=04-00"
+    store.create_run_if_absent(
+        forecast_run_id=run_id,
+        scrape_date="2026-05-22",
+        scheduled_utc_time="2026-05-22T14:00:00+00:00",
+        local_scrape_time="04:00",
+        local_date="2026-05-22",
+        utc_offset=-10,
+        expected_scrape_count=1,
+    )
+    store.seed_spots(forecast_run_id=run_id, spots=[{"spot_id": "s1", "spot_version_id": "v1"}])
+    table.update_item(
+        Key=store.spot_key(run_id, "s1"),
+        UpdateExpression="SET processing_status=:status",
+        ExpressionAttributeValues={":status": "in_progress"},
+    )
+
+    def fail_transaction(**kwargs):
+        raise AssertionError("mark_processing_terminal should not call TransactWriteItems")
+
+    monkeypatch.setattr(store.dynamodb.meta.client, "transact_write_items", fail_transaction)
+
+    assert (
+        store.mark_processing_terminal(
+            forecast_run_id=run_id,
+            spot_id="s1",
+            processing_status="success",
+        )
+        is True
+    )
+
+    run = table.get_item(Key=store.run_key(run_id))["Item"]
+    spot = table.get_item(Key=store.spot_key(run_id, "s1"))["Item"]
+    assert spot["processing_status"] == "success"
+    assert run["terminal_processing_count"] == 1
+    assert run["successful_processing_count"] == 1
+
+
+@mock_aws
+def test_scrape_terminal_run_counter_failure_leaves_spot_terminal_but_counter_unchanged(monkeypatch):
+    dynamodb, table = create_table()
+    store = ForecastControlStore(table_name="forecast-control-test", dynamodb_resource=dynamodb)
+    run_id = "forecast#offset=-10#scrape_date=2026-05-22#time=04-00"
+    store.create_run_if_absent(
+        forecast_run_id=run_id,
+        scrape_date="2026-05-22",
+        scheduled_utc_time="2026-05-22T14:00:00+00:00",
+        local_scrape_time="04:00",
+        local_date="2026-05-22",
+        utc_offset=-10,
+        expected_scrape_count=1,
+    )
+    store.seed_spots(forecast_run_id=run_id, spots=[{"spot_id": "s1", "spot_version_id": "v1"}])
+    original_update_item = store.table.update_item
+    call_count = 0
+
+    def fail_second_update(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise ClientError(
+                {"Error": {"Code": "ProvisionedThroughputExceededException", "Message": "throttled"}},
+                "UpdateItem",
+            )
+        return original_update_item(**kwargs)
+
+    monkeypatch.setattr(store.table, "update_item", fail_second_update)
 
     with pytest.raises(ClientError):
         store.record_scrape_terminal(
@@ -392,8 +330,8 @@ def test_scrape_terminal_transaction_failure_leaves_spot_and_run_counters_unchan
 
     run = table.get_item(Key=store.run_key(run_id))["Item"]
     spot = table.get_item(Key=store.spot_key(run_id, "s1"))["Item"]
-    assert spot["scrape_status"] == "planned"
-    assert "raw_key" not in spot
+    assert spot["scrape_status"] == "success"
+    assert spot["raw_key"] == "key.json.gz"
     assert run["terminal_scrape_count"] == 0
     assert run["successful_scrape_count"] == 0
     assert run["expected_processing_count"] == 0
@@ -442,7 +380,6 @@ def test_claim_processing_and_mark_success_increment_processing_once(monkeypatch
         expected_scrape_count=1,
     )
     store.seed_spots(forecast_run_id=run_id, spots=[{"spot_id": "s1", "spot_version_id": "v1"}])
-    install_transaction_stub(store, table, monkeypatch)
     store.record_scrape_terminal(forecast_run_id=run_id, spot_id="s1", scrape_status="success")
 
     assert store.claim_processing(forecast_run_id=run_id, spot_id="s1") is True
@@ -484,7 +421,6 @@ def test_failed_scrape_counts_once_and_run_completes_with_scrape_failures(monkey
         expected_scrape_count=1,
     )
     store.seed_spots(forecast_run_id=run_id, spots=[{"spot_id": "s1", "spot_version_id": "v1"}])
-    install_transaction_stub(store, table, monkeypatch)
 
     assert (
         store.record_scrape_terminal(
@@ -534,7 +470,6 @@ def test_processing_failure_counts_once_and_run_completes_with_processing_failur
         expected_scrape_count=1,
     )
     store.seed_spots(forecast_run_id=run_id, spots=[{"spot_id": "s1", "spot_version_id": "v1"}])
-    install_transaction_stub(store, table, monkeypatch)
     store.record_scrape_terminal(forecast_run_id=run_id, spot_id="s1", scrape_status="success")
     assert store.claim_processing(forecast_run_id=run_id, spot_id="s1") is True
 
