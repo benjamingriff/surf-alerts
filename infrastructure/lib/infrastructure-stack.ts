@@ -29,7 +29,7 @@ export class InfrastructureStack extends cdk.Stack {
       lifecycleRules: [
         {
           prefix: "raw/forecast/",
-          expiration: cdk.Duration.days(30),
+          expiration: cdk.Duration.days(90),
           abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
         },
         {
@@ -109,6 +109,7 @@ export class InfrastructureStack extends cdk.Stack {
       {
         queueName: `${projectName}-forecast-completion-queue`,
         visibilityTimeout: cdk.Duration.seconds(1800),
+        retentionPeriod: cdk.Duration.days(14),
       },
     );
 
@@ -358,7 +359,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     new events.Rule(this, "ForecastRunPlannerHourlyRule", {
       ruleName: `${projectName}-forecast-run-planner-schedule`,
-      enabled: false,
+      enabled: true,
       schedule: events.Schedule.cron({ minute: "0" }),
       targets: [new targets.LambdaFunction(forecastRunPlanner.lambdaFunction)],
     });
@@ -393,7 +394,7 @@ export class InfrastructureStack extends cdk.Stack {
     forecastSpotProcessor.lambdaFunction.addEventSource(
       new lambdaEventSources.SqsEventSource(forecastCompletionQueue.queue, {
         batchSize: 1,
-        enabled: true,
+        enabled: false,
         reportBatchItemFailures: false,
         maxConcurrency: 2,
       }),

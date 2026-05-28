@@ -5,6 +5,7 @@ import * as sqs from "aws-cdk-lib/aws-sqs";
 export interface SqsQueueProps {
   queueName: string;
   visibilityTimeout: cdk.Duration;
+  retentionPeriod?: cdk.Duration;
 }
 
 export class SqsQueue extends Construct {
@@ -23,7 +24,7 @@ export class SqsQueue extends Construct {
     this.queue = new sqs.Queue(this, "Queue", {
       queueName: props.queueName,
       visibilityTimeout: props.visibilityTimeout,
-      retentionPeriod: cdk.Duration.days(1),
+      retentionPeriod: props.retentionPeriod ?? cdk.Duration.days(1),
       deadLetterQueue: {
         queue: this.deadLetterQueue,
         maxReceiveCount: 3,
