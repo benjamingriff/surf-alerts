@@ -13,7 +13,11 @@ def get_connection_string(parameter_name: str | None = None) -> str:
 
 @contextmanager
 def connect(parameter_name: str | None = None):
-    conn = psycopg.connect(get_connection_string(parameter_name), row_factory=dict_row)
+    conn = psycopg.connect(
+        get_connection_string(parameter_name),
+        row_factory=dict_row,
+        prepare_threshold=None,
+    )
     try:
         yield conn
     finally:
