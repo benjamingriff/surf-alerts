@@ -28,6 +28,28 @@ def _attribute_values(values: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {key: _SERIALIZER.serialize(value) for key, value in values.items()}
 
 
+def _client_s(value: str) -> dict[str, str]:
+    return {"S": value}
+
+
+def _client_n(value: int) -> dict[str, str]:
+    return {"N": str(value)}
+
+
+def _client_attribute_values(values: dict[str, Any]) -> dict[str, dict[str, str]]:
+    client_values: dict[str, dict[str, str]] = {}
+    for key, value in values.items():
+        if isinstance(value, bool):
+            raise TypeError("Boolean transaction values must be serialized explicitly")
+        if isinstance(value, int):
+            client_values[key] = _client_n(value)
+        elif isinstance(value, str):
+            client_values[key] = _client_s(value)
+        else:
+            raise TypeError(f"Unsupported transaction value type for {key}: {type(value)}")
+    return client_values
+
+
 def _key(key: dict[str, str]) -> dict[str, dict[str, Any]]:
     return {name: _SERIALIZER.serialize(value) for name, value in key.items()}
 
@@ -226,7 +248,7 @@ class ForecastControlStore:
                             "TableName": self.table_name,
                             "Key": _key(self.spot_key(forecast_run_id, spot_id)),
                             "UpdateExpression": ", ".join(update),
-                            "ExpressionAttributeValues": _attribute_values(values),
+                            "ExpressionAttributeValues": _client_attribute_values(values),
                             "ConditionExpression": "scrape_status IN (:planned, :in_progress)",
                         }
                     },
@@ -240,7 +262,7 @@ class ForecastControlStore:
                                 "terminal_scrape_count=if_not_exists(terminal_scrape_count, :zero) + :one, "
                                 f"{run_inc}=if_not_exists({run_inc}, :zero) + :one"
                             ),
-                            "ExpressionAttributeValues": _attribute_values(
+                            "ExpressionAttributeValues": _client_attribute_values(
                                 {
                                     ":zero": 0,
                                     ":one": 1,
@@ -323,7 +345,7 @@ class ForecastControlStore:
                             "TableName": self.table_name,
                             "Key": _key(self.spot_key(forecast_run_id, spot_id)),
                             "UpdateExpression": ", ".join(update),
-                            "ExpressionAttributeValues": _attribute_values(values),
+                            "ExpressionAttributeValues": _client_attribute_values(values),
                             "ConditionExpression": "processing_status=:in_progress",
                         }
                     },
@@ -336,7 +358,7 @@ class ForecastControlStore:
                                 "terminal_processing_count=if_not_exists(terminal_processing_count, :zero) + :one, "
                                 f"{run_inc}=if_not_exists({run_inc}, :zero) + :one"
                             ),
-                            "ExpressionAttributeValues": _attribute_values(
+                            "ExpressionAttributeValues": _client_attribute_values(
                                 {
                                     ":zero": 0,
                                     ":one": 1,
