@@ -6,7 +6,7 @@ from pathlib import Path
 from forecast_spot_processor.handler import CONFLICT_TARGETS, TABLE_COLUMNS
 
 
-MIGRATION = Path(__file__).parents[1] / "migrations" / "0002_create_forecast_tables.sql"
+MIGRATION = Path(__file__).parents[1] / "migrations" / "0003_create_partitioned_forecast_tables.sql"
 ACTIVE_TABLES = {
     "forecast_fact_rating",
     "forecast_fact_wave",
@@ -33,13 +33,17 @@ def _sql() -> str:
     return MIGRATION.read_text()
 
 
-def _created_tables(sql: str) -> set[str]:
-    return set(re.findall(r"create table if not exists\s+(forecast_\w+)", sql, flags=re.I))
+def _created_parent_tables(sql: str) -> set[str]:
+    return set(
+        re.findall(
+            r"create table if not exists\s+(forecast_\w+)\s*\(", sql, flags=re.I
+        )
+    )
 
 
 def _table_body(sql: str, table: str) -> str:
     match = re.search(
-        rf"create table if not exists\s+{table}\s*\((.*?)\n\);",
+        rf"create table if not exists\s+{table}\s*\((.*?)\n\)\s+partition by range\s*\(scheduled_utc_time\);",
         sql,
         flags=re.I | re.S,
     )
@@ -58,8 +62,8 @@ def _columns(sql: str, table: str) -> set[str]:
     return columns
 
 
-def test_migration_creates_only_active_v1_forecast_fact_tables():
-    tables = _created_tables(_sql())
+def test_migration_creates_only_active_v1_forecast_fact_parent_tables():
+    tables = _created_parent_tables(_sql())
 
     assert tables == ACTIVE_TABLES
     assert all("weather" not in table and "sunlight" not in table for table in tables)
@@ -86,19 +90,49 @@ def test_unique_constraints_match_processor_on_conflict_targets():
 
 def test_swells_and_tides_uniqueness_preserves_source_ordinals():
     assert CONFLICT_TARGETS["forecast_fact_swells"] == (
-        "forecast_run_id, spot_id, forecast_ts, swell_index"
+        "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts, swell_index"
     )
     assert CONFLICT_TARGETS["forecast_fact_tides"] == (
-        "forecast_run_id, spot_id, forecast_ts, tide_index"
+        "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts, tide_index"
     )
 
 
-def test_every_forecast_table_has_scraped_at_cleanup_index():
+def test_every_forecast_parent_table_is_range_partitioned_by_scheduled_utc_time():
     sql = _sql()
 
     for table in ACTIVE_TABLES:
         assert re.search(
-            rf"create index if not exists\s+{table}_scraped_at_idx\s+on\s+{table}\s*\(scraped_at\)",
+            rf"create table if not exists\s+{table}\s*\(.*?\)\s+partition by range\s*\(scheduled_utc_time\)",
+            sql,
+            flags=re.I | re.S,
+        ), table
+
+
+def test_every_forecast_table_has_default_partition_and_initial_partition_block():
+    sql = _sql()
+
+    for table in ACTIVE_TABLES:
+        assert re.search(
+            rf"create table if not exists\s+{table}_default\s+partition of\s+{table}\s+default",
             sql,
             flags=re.I,
         ), table
+    assert "generate_series" in sql
+    assert "(now() at time zone 'utc')::date + 4" in sql
+
+
+def test_indexes_support_spot_time_and_run_lookup_without_scraped_at_indexes():
+    sql = _sql()
+
+    for table in ACTIVE_TABLES:
+        assert re.search(
+            rf"create index if not exists\s+{table}_spot_scheduled_forecast_ts_idx\s+on\s+{table}\s*\(spot_id, scheduled_utc_time, forecast_ts\)",
+            sql,
+            flags=re.I,
+        ), table
+        assert re.search(
+            rf"create index if not exists\s+{table}_run_idx\s+on\s+{table}\s*\(forecast_run_id\)",
+            sql,
+            flags=re.I,
+        ), table
+        assert f"{table}_scraped_at_idx" not in sql

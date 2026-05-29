@@ -122,11 +122,11 @@ TABLE_COLUMNS = {
 }
 
 CONFLICT_TARGETS = {
-    "forecast_fact_rating": "forecast_run_id, spot_id, forecast_ts",
-    "forecast_fact_wave": "forecast_run_id, spot_id, forecast_ts",
-    "forecast_fact_swells": "forecast_run_id, spot_id, forecast_ts, swell_index",
-    "forecast_fact_wind": "forecast_run_id, spot_id, forecast_ts",
-    "forecast_fact_tides": "forecast_run_id, spot_id, forecast_ts, tide_index",
+    "forecast_fact_rating": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts",
+    "forecast_fact_wave": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts",
+    "forecast_fact_swells": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts, swell_index",
+    "forecast_fact_wind": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts",
+    "forecast_fact_tides": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts, tide_index",
 }
 
 
