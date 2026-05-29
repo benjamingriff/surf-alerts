@@ -6,7 +6,7 @@ from typing import Any
 import boto3
 from forecast_control import ForecastControlStore
 from forecast_transform import ForecastRows, transform_forecast_envelope
-from postgres_client import connect
+from postgres_client import get_reusable_connection
 
 logger = logging.getLogger(__name__)
 
@@ -208,10 +208,8 @@ def process_completion(
         rows = transform_forecast_envelope(envelope, source_raw_key=raw_key)
         failure_source = "postgres"
         if connection is None:
-            with connect() as conn:
-                insert_forecast_rows(conn, rows)
-        else:
-            insert_forecast_rows(connection, rows)
+            connection = get_reusable_connection()
+        insert_forecast_rows(connection, rows)
     except Exception as exc:
         reason = str(exc)[:1000]
         logger.warning(

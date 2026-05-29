@@ -90,6 +90,34 @@ class ConnSpy:
 
 
 @mock_aws
+def test_success_completion_uses_reusable_connection_when_not_injected(monkeypatch):
+    s3 = boto3.client("s3", region_name="us-east-1")
+    s3.create_bucket(Bucket="raw-bucket")
+    body = gzip.compress(json.dumps(envelope()).encode())
+    s3.put_object(Bucket="raw-bucket", Key="forecast/raw.json.gz", Body=body)
+    store = StoreSpy()
+    conn = ConnSpy()
+    monkeypatch.setattr(
+        "forecast_spot_processor.handler.get_reusable_connection", lambda: conn
+    )
+
+    result = process_completion(
+        {
+            "forecast_run_id": "run-1",
+            "spot_id": "spot-1",
+            "scrape_status": "success",
+            "raw_bucket": "raw-bucket",
+            "raw_key": "forecast/raw.json.gz",
+            "scraped_at": "2026-05-22T14:01:00+00:00",
+        },
+        store=store,
+    )
+
+    assert result == "success"
+    assert conn.transactions == 1
+
+
+@mock_aws
 def test_success_completion_reads_raw_transforms_inserts_all_tables_and_marks_success():
     s3 = boto3.client("s3", region_name="us-east-1")
     s3.create_bucket(Bucket="raw-bucket")
