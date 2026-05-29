@@ -113,11 +113,11 @@ export class InfrastructureStack extends cdk.Stack {
       },
     );
 
-    const supabasePostgresUrl =
+    const postgresUrl =
       ssm.StringParameter.fromSecureStringParameterAttributes(
         this,
-        "SupabasePostgresUrlParameter",
-        { parameterName: "/surf-alerts/supabase/postgres-url" },
+        "PostgresUrlParameter",
+        { parameterName: "/surf-alerts/rds/postgres-url" },
       );
 
     const sitemapScraper = new ScheduledScraper(
@@ -206,8 +206,8 @@ export class InfrastructureStack extends cdk.Stack {
           SPOT_SCRAPER_QUEUE_URL: spotScraper.queue.queueUrl,
           DISCOVERY_SPOT_BATCH_PROCESSOR_QUEUE_URL:
             discoverySpotBatchProcessorQueue.queue.queueUrl,
-          SUPABASE_POSTGRES_URL_PARAMETER_NAME:
-            "/surf-alerts/supabase/postgres-url",
+          POSTGRES_URL_PARAMETER_NAME:
+            "/surf-alerts/rds/postgres-url",
         },
       },
     );
@@ -233,8 +233,8 @@ export class InfrastructureStack extends cdk.Stack {
           FORECAST_SCRAPE_LOCAL_TIME: "04:00",
           FORECAST_MIN_UTC_OFFSET: "-12",
           FORECAST_MAX_UTC_OFFSET: "14",
-          SUPABASE_POSTGRES_URL_PARAMETER_NAME:
-            "/surf-alerts/supabase/postgres-url",
+          POSTGRES_URL_PARAMETER_NAME:
+            "/surf-alerts/rds/postgres-url",
         },
       },
     );
@@ -281,8 +281,8 @@ export class InfrastructureStack extends cdk.Stack {
           DATA_BUCKET: dataBucket.bucketName,
           DISCOVERY_CONTROL_TABLE_NAME: discoveryControlTable.tableName,
           DISCOVERY_SPOT_BATCH_S3_READ_WORKERS: "16",
-          SUPABASE_POSTGRES_URL_PARAMETER_NAME:
-            "/surf-alerts/supabase/postgres-url",
+          POSTGRES_URL_PARAMETER_NAME:
+            "/surf-alerts/rds/postgres-url",
         },
       },
     );
@@ -304,8 +304,8 @@ export class InfrastructureStack extends cdk.Stack {
         memorySize: 1024,
         environment: {
           FORECAST_CONTROL_TABLE_NAME: forecastControlTable.tableName,
-          SUPABASE_POSTGRES_URL_PARAMETER_NAME:
-            "/surf-alerts/supabase/postgres-url",
+          POSTGRES_URL_PARAMETER_NAME:
+            "/surf-alerts/rds/postgres-url",
         },
       },
     );
@@ -352,10 +352,10 @@ export class InfrastructureStack extends cdk.Stack {
     forecastCompletionQueue.queue.grantSendMessages(
       forecastScraper.lambdaFunction,
     );
-    supabasePostgresUrl.grantRead(discoveryRunPlanner.lambdaFunction);
-    supabasePostgresUrl.grantRead(discoverySpotBatchProcessor.lambdaFunction);
-    supabasePostgresUrl.grantRead(forecastRunPlanner.lambdaFunction);
-    supabasePostgresUrl.grantRead(forecastSpotProcessor.lambdaFunction);
+    postgresUrl.grantRead(discoveryRunPlanner.lambdaFunction);
+    postgresUrl.grantRead(discoverySpotBatchProcessor.lambdaFunction);
+    postgresUrl.grantRead(forecastRunPlanner.lambdaFunction);
+    postgresUrl.grantRead(forecastSpotProcessor.lambdaFunction);
 
     new events.Rule(this, "ForecastRunPlannerHourlyRule", {
       ruleName: `${projectName}-forecast-run-planner-schedule`,

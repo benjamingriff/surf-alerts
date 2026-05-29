@@ -79,7 +79,7 @@ def _put_json(bucket: str, key: str, body: dict) -> None:
 
 
 def _current_active_ids() -> set[str]:
-    with connect(os.environ["SUPABASE_POSTGRES_URL_PARAMETER_NAME"]) as conn:
+    with connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select spot_id from discovery_spot_versions where is_current = true and event_type <> 'removed'"

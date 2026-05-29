@@ -6,15 +6,25 @@ import psycopg
 from psycopg.rows import dict_row
 
 
-def get_connection_string(parameter_name: str | None = None) -> str:
-    name = parameter_name or os.environ["SUPABASE_POSTGRES_URL_PARAMETER_NAME"]
+class PostgresConfigurationError(RuntimeError):
+    """Raised when required Postgres runtime configuration is missing."""
+
+
+def get_connection_string() -> str:
+    try:
+        name = os.environ["POSTGRES_URL_PARAMETER_NAME"]
+    except KeyError as exc:
+        raise PostgresConfigurationError(
+            "POSTGRES_URL_PARAMETER_NAME environment variable is required"
+        ) from exc
+
     return boto3.client("ssm").get_parameter(Name=name, WithDecryption=True)["Parameter"]["Value"]
 
 
 @contextmanager
-def connect(parameter_name: str | None = None):
+def connect():
     conn = psycopg.connect(
-        get_connection_string(parameter_name),
+        get_connection_string(),
         row_factory=dict_row,
         prepare_threshold=None,
     )

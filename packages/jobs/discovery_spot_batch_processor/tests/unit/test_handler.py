@@ -345,11 +345,11 @@ def test_process_discovery_run_returns_for_missing_or_complete_runs(monkeypatch)
 
 def test_process_discovery_run_completes_when_success_count_matches(monkeypatch):
     monkeypatch.setenv("DATA_BUCKET", "bucket")
-    monkeypatch.setenv("SUPABASE_POSTGRES_URL_PARAMETER_NAME", "param")
+    monkeypatch.setenv("POSTGRES_URL_PARAMETER_NAME", "param")
     applied = []
 
     @contextmanager
-    def fake_connect(parameter_name):
+    def fake_connect():
         yield "conn"
 
     def fake_build_added_rows(**kwargs):

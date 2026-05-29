@@ -126,7 +126,7 @@ def test_batch_processor_happy_path_adds_successes_removes_tombstones_and_marks_
 ):
     bucket = os.environ["S3_BUCKET_NAME"]
     monkeypatch.setenv("DATA_BUCKET", bucket)
-    monkeypatch.setenv("SUPABASE_POSTGRES_URL_PARAMETER_NAME", "/param")
+    monkeypatch.setenv("POSTGRES_URL_PARAMETER_NAME", "/param")
     monkeypatch.setattr(
         "discovery_spot_batch_processor.handler._utc_now_iso", lambda: "2026-05-01T06:10:00Z"
     )
@@ -189,7 +189,7 @@ def test_batch_processor_happy_path_adds_successes_removes_tombstones_and_marks_
         }
     ]
     monkeypatch.setattr(
-        "discovery_spot_batch_processor.handler.connect", lambda _: InMemoryConnection(db)
+        "discovery_spot_batch_processor.handler.connect", lambda: InMemoryConnection(db)
     )
 
     response = lambda_handler(
@@ -217,7 +217,7 @@ def test_batch_processor_conflict_rolls_back_and_does_not_mark_complete(
 ):
     bucket = os.environ["S3_BUCKET_NAME"]
     monkeypatch.setenv("DATA_BUCKET", bucket)
-    monkeypatch.setenv("SUPABASE_POSTGRES_URL_PARAMETER_NAME", "/param")
+    monkeypatch.setenv("POSTGRES_URL_PARAMETER_NAME", "/param")
     monkeypatch.setattr(
         "discovery_spot_batch_processor.handler._utc_now_iso", lambda: "2026-05-01T06:10:00Z"
     )
@@ -287,7 +287,7 @@ def test_batch_processor_conflict_rolls_back_and_does_not_mark_complete(
         }
     ]
     monkeypatch.setattr(
-        "discovery_spot_batch_processor.handler.connect", lambda _: InMemoryConnection(db)
+        "discovery_spot_batch_processor.handler.connect", lambda: InMemoryConnection(db)
     )
 
     try:

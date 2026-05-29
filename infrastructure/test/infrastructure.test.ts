@@ -60,7 +60,7 @@ test("discovery infrastructure resources are synthesized", () => {
   template.hasResourceProperties("AWS::S3::Bucket", {
     LifecycleConfiguration: {
       Rules: Match.arrayWith([
-        Match.objectLike({ Prefix: "raw/forecast/", Status: "Enabled", ExpirationInDays: 30 }),
+        Match.objectLike({ Prefix: "raw/forecast/", Status: "Enabled", ExpirationInDays: 90 }),
         Match.objectLike({ Prefix: "raw/", Status: "Enabled" }),
         Match.objectLike({ Prefix: "control/", Status: "Enabled" }),
       ]),
@@ -94,7 +94,7 @@ test("discovery infrastructure resources are synthesized", () => {
         FORECAST_SCRAPE_LOCAL_TIME: "04:00",
         FORECAST_MIN_UTC_OFFSET: "-12",
         FORECAST_MAX_UTC_OFFSET: "14",
-        SUPABASE_POSTGRES_URL_PARAMETER_NAME: "/surf-alerts/supabase/postgres-url",
+        POSTGRES_URL_PARAMETER_NAME: "/surf-alerts/rds/postgres-url",
       }),
     },
   });
@@ -105,7 +105,7 @@ test("discovery infrastructure resources are synthesized", () => {
     Environment: {
       Variables: Match.objectLike({
         FORECAST_CONTROL_TABLE_NAME: { Ref: Match.stringLikeRegexp("ForecastControlTable") },
-        SUPABASE_POSTGRES_URL_PARAMETER_NAME: "/surf-alerts/supabase/postgres-url",
+        POSTGRES_URL_PARAMETER_NAME: "/surf-alerts/rds/postgres-url",
       }),
     },
   });

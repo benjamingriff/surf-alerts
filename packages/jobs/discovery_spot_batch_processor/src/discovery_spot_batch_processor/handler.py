@@ -283,7 +283,7 @@ def process_discovery_run(run_id: str, *, store: ControlStore | None = None) -> 
             f"built {len(added_rows)} rows from {len(success_items)} successful spots"
         )
 
-    with connect(os.environ["SUPABASE_POSTGRES_URL_PARAMETER_NAME"]) as conn:
+    with connect() as conn:
         apply_spot_version_changes(
             conn=conn,
             run_id=run_id,

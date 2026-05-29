@@ -52,7 +52,7 @@ def forecast_run_id(*, utc_offset: int, scrape_date: str, local_scrape_time: str
 
 
 def _live_spots_for_offset(utc_offset: int) -> list[dict[str, Any]]:
-    with connect(os.environ["SUPABASE_POSTGRES_URL_PARAMETER_NAME"]) as conn:
+    with connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
