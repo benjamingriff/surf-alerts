@@ -2,7 +2,7 @@
 
 ## Processed Spot Discovery State
 
-The canonical, queryable representation of Surfline spot discovery after raw payloads have been interpreted. This includes the current spot catalog and historical spot versions. In this project, processed spot discovery state lives in Supabase/Postgres and is the source for selecting live spots due for forecast scraping.
+The canonical, queryable representation of Surfline spot discovery after raw payloads have been interpreted. This includes the current spot catalog and historical spot versions. Processed spot discovery state lives in RDS Postgres and is the source for selecting live spots due for forecast scraping.
 
 ## Spot Lifecycle Event
 
@@ -48,6 +48,18 @@ All live spots whose stored UTC offset makes them due for forecast scraping at o
 
 The UTC calendar date on which scraper work is scheduled or collected. Scrape date is process metadata and is not the local surf date for a spot or forecast run.
 
+## Forecast Partition Day
+
+The UTC calendar day derived from a forecast fact's scheduled UTC time. Forecast partition days group facts by when the scrape was supposed to run, not by when the scrape actually completed.
+
 ## Forecast Run Planner
 
 The pipeline role that creates a forecast run and its expected spot scrape membership. A forecast run planner belongs to pipeline control state and does not create forecast facts.
+
+## Forecast Hot Store
+
+The short-term, queryable store of processed forecast facts. Forecast hot store data is retained for three daily partitions: one live query day, one archive-processing day, and one recovery buffer day.
+
+## Forecast Archive
+
+The durable historical store of processed forecast facts after they leave the forecast hot store. The forecast archive is intended to preserve full forecast history independently of raw scraper payload retention.
