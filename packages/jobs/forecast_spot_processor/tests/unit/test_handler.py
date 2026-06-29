@@ -5,7 +5,7 @@ from contextlib import contextmanager
 import boto3
 from moto import mock_aws
 
-from forecast_spot_processor.handler import process_completion
+from forecast_spot_processor.handler import CONFLICT_TARGETS, process_completion
 
 
 def envelope():
@@ -87,6 +87,16 @@ class ConnSpy:
 
     def cursor(self):
         return self.cursor_spy
+
+
+def test_forecast_fact_conflict_targets_include_partition_key_and_source_ordinals():
+    assert CONFLICT_TARGETS == {
+        "forecast_fact_rating": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts",
+        "forecast_fact_wave": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts",
+        "forecast_fact_swells": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts, swell_index",
+        "forecast_fact_wind": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts",
+        "forecast_fact_tides": "scheduled_utc_time, forecast_run_id, spot_id, forecast_ts, tide_index",
+    }
 
 
 @mock_aws
