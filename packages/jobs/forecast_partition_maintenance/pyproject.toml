@@ -1,0 +1,16 @@
+[project]
+name = "forecast-partition-maintenance"
+version = "0.1.0"
+description = "Maintains forecast hot-store Postgres partitions"
+requires-python = ">=3.12"
+dependencies = [
+  "aws-lambda-powertools>=3.23.0",
+  "postgres-client",
+]
+
+[tool.uv.sources]
+postgres-client = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9.4,<0.10.0"]
+build-backend = "uv_build"

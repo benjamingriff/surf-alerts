@@ -16,6 +16,7 @@ test("discovery infrastructure resources are synthesized", () => {
     "surf-alerts-forecast-scraper",
     "surf-alerts-forecast-run-planner",
     "surf-alerts-forecast-spot-processor",
+    "surf-alerts-forecast-partition-maintenance",
   ].forEach((functionName) => {
     template.hasResourceProperties("AWS::Lambda::Function", { FunctionName: functionName });
   });
@@ -82,7 +83,7 @@ test("discovery infrastructure resources are synthesized", () => {
       }),
     ]),
   });
-  template.resourceCountIs("AWS::Events::Rule", 2);
+  template.resourceCountIs("AWS::Events::Rule", 3);
   template.hasResourceProperties("AWS::Events::Rule", {
     ScheduleExpression: "cron(0 6 1 * ? *)",
   });
@@ -90,6 +91,12 @@ test("discovery infrastructure resources are synthesized", () => {
     ScheduleExpression: "cron(0 * * * ? *)",
     Targets: Match.arrayWith([
       Match.objectLike({ Arn: { "Fn::GetAtt": [Match.stringLikeRegexp("ForecastRunPlannerConstructLambdaFn"), "Arn"] } }),
+    ]),
+  });
+  template.hasResourceProperties("AWS::Events::Rule", {
+    ScheduleExpression: "cron(45 * * * ? *)",
+    Targets: Match.arrayWith([
+      Match.objectLike({ Arn: { "Fn::GetAtt": [Match.stringLikeRegexp("ForecastPartitionMaintenanceConstructLambdaFn"), "Arn"] } }),
     ]),
   });
 
@@ -141,6 +148,16 @@ test("discovery infrastructure resources are synthesized", () => {
     Environment: {
       Variables: Match.objectLike({
         FORECAST_CONTROL_TABLE_NAME: { Ref: Match.stringLikeRegexp("ForecastControlTable") },
+        POSTGRES_URL_PARAMETER_NAME: "/surf-alerts/rds/postgres-url",
+      }),
+    },
+  });
+  template.hasResourceProperties("AWS::Lambda::Function", {
+    FunctionName: "surf-alerts-forecast-partition-maintenance",
+    Timeout: 60,
+    MemorySize: 512,
+    Environment: {
+      Variables: Match.objectLike({
         POSTGRES_URL_PARAMETER_NAME: "/surf-alerts/rds/postgres-url",
       }),
     },

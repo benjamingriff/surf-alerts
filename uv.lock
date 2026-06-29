@@ -13,6 +13,7 @@ members = [
     "discovery-spot-model",
     "dispatcher",
     "forecast-control",
+    "forecast-partition-maintenance",
     "forecast-run-planner",
     "forecast-scraper",
     "forecast-spot-processor",
@@ -446,6 +447,21 @@ dependencies = [
 requires-dist = [
     { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
     { name = "boto3", specifier = ">=1.35.0" },
+]
+
+[[package]]
+name = "forecast-partition-maintenance"
+version = "0.1.0"
+source = { editable = "packages/jobs/forecast_partition_maintenance" }
+dependencies = [
+    { name = "aws-lambda-powertools" },
+    { name = "postgres-client" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aws-lambda-powertools", specifier = ">=3.23.0" },
+    { name = "postgres-client", editable = "packages/libs/postgres_client" },
 ]
 
 [[package]]

@@ -367,6 +367,28 @@ export class InfrastructureStack extends cdk.Stack {
       },
     );
 
+    const forecastPartitionMaintenance = new DockerFunction(
+      this,
+      "ForecastPartitionMaintenanceConstruct",
+      {
+        projectName,
+        functionName: "forecast-partition-maintenance",
+        codePath: codebuildSrcDir,
+        dockerfile: path.join(
+          "packages",
+          "jobs",
+          "forecast_partition_maintenance",
+          "Dockerfile",
+        ),
+        timeout: 60,
+        memorySize: 512,
+        environment: {
+          POSTGRES_URL_PARAMETER_NAME:
+            "/surf-alerts/rds/postgres-url",
+        },
+      },
+    );
+
     dataBucket.grantReadWrite(sitemapScraper.lambdaFunction);
     dataBucket.grantReadWrite(spotScraper.lambdaFunction);
     dataBucket.grantReadWrite(forecastScraper.lambdaFunction);
@@ -413,12 +435,24 @@ export class InfrastructureStack extends cdk.Stack {
     postgresUrl.grantRead(discoverySpotBatchProcessor.lambdaFunction);
     postgresUrl.grantRead(forecastRunPlanner.lambdaFunction);
     postgresUrl.grantRead(forecastSpotProcessor.lambdaFunction);
+    postgresUrl.grantRead(forecastPartitionMaintenance.lambdaFunction);
 
     new events.Rule(this, "ForecastRunPlannerHourlyRule", {
       ruleName: `${projectName}-forecast-run-planner-schedule`,
       enabled: true,
       schedule: events.Schedule.cron({ minute: "0" }),
       targets: [new targets.LambdaFunction(forecastRunPlanner.lambdaFunction)],
+    });
+
+    new events.Rule(this, "ForecastPartitionMaintenanceHourlyRule", {
+      ruleName: `${projectName}-forecast-partition-maintenance-schedule`,
+      enabled: true,
+      schedule: events.Schedule.cron({ minute: "45" }),
+      targets: [
+        new targets.LambdaFunction(
+          forecastPartitionMaintenance.lambdaFunction,
+        ),
+      ],
     });
 
     discoveryRunPlanner.lambdaFunction.addEventSource(
