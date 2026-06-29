@@ -485,7 +485,7 @@ export class InfrastructureStack extends cdk.Stack {
     forecastSpotProcessor.lambdaFunction.addEventSource(
       new lambdaEventSources.SqsEventSource(forecastCompletionQueue.queue, {
         batchSize: 1,
-        enabled: false,
+        enabled: true,
         reportBatchItemFailures: false,
         maxConcurrency: 2,
       }),
