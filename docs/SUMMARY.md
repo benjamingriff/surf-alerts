@@ -43,6 +43,7 @@
 ## Operations
 
 * [Operations](operations/README.md)
+* [Manual RDS Setup](operations/rds-setup.md)
 * [Migration Plan](operations/migration-plan.md)
 * [CI/CD](operations/ci-cd.md)
 
