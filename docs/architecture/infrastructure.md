@@ -15,7 +15,7 @@ AWS CDK (TypeScript) infrastructure in `infrastructure/`.
 ### RDS Processed State Database
 
 - Instance identifier: `surf-alerts-processed-state`
-- Engine: PostgreSQL 16.4
+- Engine: PostgreSQL 16.14
 - Database name: `surf_alerts`
 - Instance class: `db.t4g.small`, single-AZ
 - Storage: 100GB gp3, encrypted, no storage autoscaling

@@ -110,7 +110,7 @@ export class InfrastructureStack extends cdk.Stack {
     new rds.DatabaseInstance(this, "ProcessedStateDatabase", {
       instanceIdentifier: `${projectName}-processed-state`,
       engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_16_4,
+        version: rds.PostgresEngineVersion.of("16.14", "16"),
       }),
       credentials: rds.Credentials.fromGeneratedSecret("surf_alerts_user", {
         secretName: `${projectName}/postgres/app-credentials`,
