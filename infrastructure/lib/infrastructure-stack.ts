@@ -4,7 +4,9 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as rds from "aws-cdk-lib/aws-rds";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
@@ -75,6 +77,61 @@ export class InfrastructureStack extends cdk.Stack {
         removalPolicy: cdk.RemovalPolicy.RETAIN,
       },
     );
+
+    const vpc = new ec2.Vpc(this, "Vpc", {
+      vpcName: projectName,
+      maxAzs: 2,
+      natGateways: 0,
+      subnetConfiguration: [
+        {
+          cidrMask: 24,
+          name: "public",
+          subnetType: ec2.SubnetType.PUBLIC,
+        },
+      ],
+    });
+
+    const databaseSecurityGroup = new ec2.SecurityGroup(
+      this,
+      "DatabaseSecurityGroup",
+      {
+        vpc,
+        securityGroupName: `${projectName}-database`,
+        description: "Public PostgreSQL access for Surf Alerts database.",
+        allowAllOutbound: true,
+      },
+    );
+    databaseSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(5432),
+      "Public SQL access for manual administration.",
+    );
+
+    new rds.DatabaseInstance(this, "ProcessedStateDatabase", {
+      instanceIdentifier: `${projectName}-processed-state`,
+      engine: rds.DatabaseInstanceEngine.postgres({
+        version: rds.PostgresEngineVersion.VER_16_4,
+      }),
+      credentials: rds.Credentials.fromGeneratedSecret("surf_alerts_user", {
+        secretName: `${projectName}/postgres/app-credentials`,
+      }),
+      databaseName: "surf_alerts",
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      securityGroups: [databaseSecurityGroup],
+      publiclyAccessible: true,
+      multiAz: false,
+      instanceType: ec2.InstanceType.of(
+        ec2.InstanceClass.T4G,
+        ec2.InstanceSize.SMALL,
+      ),
+      allocatedStorage: 100,
+      storageType: rds.StorageType.GP3,
+      storageEncrypted: true,
+      backupRetention: cdk.Duration.days(1),
+      deletionProtection: false,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
 
     const discoveryCompletionQueue = new SqsQueue(
       this,

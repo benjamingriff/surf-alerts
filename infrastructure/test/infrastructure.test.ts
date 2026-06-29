@@ -46,6 +46,42 @@ test("discovery infrastructure resources are synthesized", () => {
     TimeToLiveSpecification: { AttributeName: "expires_at", Enabled: true },
   });
 
+  template.resourceCountIs("AWS::RDS::DBInstance", 1);
+  template.hasResourceProperties("AWS::RDS::DBInstance", {
+    DBInstanceIdentifier: "surf-alerts-processed-state",
+    Engine: "postgres",
+    DBInstanceClass: "db.t4g.small",
+    AllocatedStorage: "100",
+    StorageType: "gp3",
+    MaxAllocatedStorage: Match.absent(),
+    MultiAZ: false,
+    StorageEncrypted: true,
+    PubliclyAccessible: true,
+    BackupRetentionPeriod: 1,
+    DeletionProtection: false,
+    DBName: "surf_alerts",
+    MasterUsername: "surf_alerts_user",
+    MasterUserPassword: Match.objectLike({
+      "Fn::Join": Match.arrayWith([Match.arrayWith([Match.stringLikeRegexp("resolve:secretsmanager")])]),
+    }),
+  });
+  template.hasResourceProperties("AWS::SecretsManager::Secret", {
+    Name: "surf-alerts/postgres/app-credentials",
+    GenerateSecretString: Match.objectLike({
+      GenerateStringKey: "password",
+      SecretStringTemplate: '{"username":"surf_alerts_user"}',
+    }),
+  });
+  template.hasResourceProperties("AWS::EC2::SecurityGroup", {
+    GroupDescription: "Public PostgreSQL access for Surf Alerts database.",
+    SecurityGroupIngress: Match.arrayWith([
+      Match.objectLike({
+        CidrIp: "0.0.0.0/0",
+        FromPort: 5432,
+        ToPort: 5432,
+      }),
+    ]),
+  });
   template.resourceCountIs("AWS::Events::Rule", 2);
   template.hasResourceProperties("AWS::Events::Rule", {
     ScheduleExpression: "cron(0 6 1 * ? *)",
